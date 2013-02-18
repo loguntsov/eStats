@@ -1,0 +1,14 @@
+%% Copyright
+{application, erlycounter, [
+	{mod, { estats_app, [ ]}},
+    {description, ""},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        gproc
+    ]},
+    {modules, { estats, [  ]}},
+    {env, []}
+]}.
