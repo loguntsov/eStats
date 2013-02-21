@@ -1,5 +1,5 @@
 %% Copyright
-{application, erlycounter, [
+{application, estats, [
 	{mod, { estats_app, [ ]}},
     {description, ""},
     {vsn, "1"},

@@ -10,8 +10,8 @@
 -export([init/1]).
 
 start() ->
-	application:start(gproc),
-	application:start(cowboy),
+	%application:start(gproc),
+	%application:start(cowboy),
 	application:start(estats),
 	ok.
 
@@ -19,6 +19,7 @@ start(_Type, _StartArgs) ->
 %	{ok, [Options]} = file:consult("erlycounter.conf"),
 %	{ok, Pid} = supervisor:start_link(?MODULE, Options),
 	io:format("eStats started"),
+  Pid = self(),
 	{ok, Pid}.
 
 %%----------------------------------------------------------------------
@@ -27,7 +28,7 @@ start(_Type, _StartArgs) ->
 %%----------------------------------------------------------------------
 stop(_State) -> ok.
 
-init(Options) ->
+init(_Options) ->
 
 %	{ ok, {{one_for_one, 5, 1000}, [
 %		{ecsaver_pool, { ecsaver, pool_start, [ Save_process ] }, permanent, 5000 , supervisor, [] },
