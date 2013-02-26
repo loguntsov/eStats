@@ -1,7 +1,7 @@
 %% Copyright
 -module(estats_offer_server).
 
--export([click/2, start_link/0, state/1]).
+-export([click/2, start_link/0, state/1, report/5, pid/0]).
 
 -include("include/click_info.hrl").
 -include("include/offer_info.hrl").
@@ -10,16 +10,33 @@
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3,terminate/2]).
 
+-export([send_report_query/4]).
+
 -record(state, {
-  data :: offer_info
+  reports :: dict(), % {Report_module(), pid()
+  is_readonly :: boolean()
 }).
 
--spec init({}) -> {ok, state}.
-init({}) -> {ok, #state{
-  data = estats_offer:new()
-}}.
+init({}) ->
+  gproc:add_local_name(offer_server),
+  {ok, #state{
+  reports = dict:from_list(lists:map(
+    fun(Report_module) ->
+      { ok, Pid } = estats_gen_report:start_link(Report_module),
+      {Report_module, Pid}
+    end, [ estats_report_count ])),
+  is_readonly = false
+}};
 
--spec click(Pid :: pid(), Click :: click_info) -> ok.
+init({readonly}) -> {ok, #state{
+  reports = dict:new(),
+  is_readonly = true
+} }.
+
+pid() ->
+  gproc:lookup_local_name(offer_server).
+
+-spec click(Pid :: pid(), Click :: click_info) -> ok | { error, Reason :: term()}.
 click(Pid, Click) ->
   gen_server:call(Pid, { click, Click }).
 
@@ -27,45 +44,60 @@ click(Pid, Click) ->
 state(Pid) ->
   gen_server:call(Pid, state).
 
+-spec report(Pid :: pid(), Report_module :: atom(), Type :: atom(), Period :: date_period(), Query :: term()) -> {ok, Result :: term()} | {error, Reason :: term()}.
+report(Pid, Report_module, Type, Period, Query) ->
+  Ref = make_ref(),
+  gen_server:cast(Pid, {report, self(), Ref, {Report_module, { Type, Period, Query} } }),
+  receive % Сообщения отправляются из send_report_query
+    {report_answer, Ref, Result} -> {ok, Result};
+    {report_error, Ref, Reason } -> {error, Reason }
+  after 10000 ->
+    {error, timeout}
+  end.
+
 -spec start_link() -> {ok, pid() }.
 start_link() ->
   gen_server:start_link(?MODULE, {}, []).
 
 %% Обработка клика
--spec handle_cast({click, Click :: click_info}, State :: state) -> {noreply, state}.
-handle_cast({click, Click}, State ) ->
-  Affiliate_offer = { Click#click_info.offer_id, Click#click_info.affiliate_id },
-  Advertiser_offer = { Click#click_info.offer_id, 0 },
-  Date = { Click#click_info.year, Click#click_info.month, Click#click_info.day },
-  Hour = Click#click_info.hour,
-  Data = State#state.data,
-
-  estats_report:counter_inc(Data#offer_info.count, Affiliate_offer , [ Date , Hour ]),
-  estats_report:counter_inc(Data#offer_info.count, Advertiser_offer , [ Date , Hour ]),
-
-  estats_report:counter_inc(Data#offer_info.count, Click#click_info.offer_id, [ Click#click_info.affiliate_id ]),
-
-  dict:map(fun(Index, Subid_item) ->
-    Subid_hash = estats_report:map_save(Data#offer_info.subid, Affiliate_offer, {Index, Subid_item} ),
-    estats_report:counter_inc(Data#offer_info.subid, Affiliate_offer, [ Date, {Index, Subid_hash} , Hour ]),
-    Subid_hash
-  end, Click#click_info.subid),
-
-  estats_report:counter_inc(Data#offer_info.domain, Affiliate_offer , [ Date, Click#click_info.domain ]),
-  estats_report:counter_inc(Data#offer_info.domain, Advertiser_offer, [ Date, Click#click_info.domain ]),
-
-  Referer_hash = estats_report:map_save(Data#offer_info.referer, Click#click_info.affiliate_id, Click#click_info.http_referer ),
-  estats_report:counter_inc(Data#offer_info.referer, Advertiser_offer, [ Referer_hash, Date ]),
-
-  {noreply, State }.
-
 handle_call({click, Click}, _From, State) ->
-  {noreply, NewState} = handle_cast({click, Click}, State),
-  {reply, ok, NewState};
+  case State#state.is_readonly of
+    false ->
+      dict:map(fun(_Report_module, Pid) ->
+        ok = estats_gen_report:click(Pid, Click)
+      end, State#state.reports),
+      {reply, ok, State};
+    true -> { reply, {error, readonly}, State }
+  end;
 
-handle_call( state, _From, State ) -> { reply, State#state.data, State };
-
+handle_call( state, _From, State ) -> { reply, State#state.reports, State };
 handle_call(_,_, State ) -> { noreply, State }.
+
+%% Выдача отчета
+handle_cast({report, From, Ref, {Report_module, Query } }, State) ->
+  case dict:find(Report_module, State#state.reports) of
+    error -> From!{report_error, Ref, report_module_not_found};
+    {ok, ReportPid } ->
+      spawn_link(?MODULE, send_report_query, [ From, Ref, ReportPid, Query ])
+  end,
+  {noreply, State}.
+
+send_report_query(From, Ref, ReportPid, {Type, Period, Query}) ->
+  try
+    Date_list = if
+      is_tuple(Period) -> if
+        tuple_size(Period) =:= 3 -> [ Period ];
+        tuple_size(Period) =:= 2 -> date:period_to_list(Period)
+      end;
+      is_list(Period) -> Period
+    end,
+    case estats_gen_report:report(ReportPid, {Type, Date_list, Query}) of
+      {ok, Result } -> From!{report_answer, Ref, Result};
+      {error, Reason } -> From!{report_error, Ref, Reason}
+    end
+  catch
+    error:Reason_error -> From!{report_error, Ref, Reason_error}
+  end.
 
 handle_info(_, State) -> { noreply, State }.
 

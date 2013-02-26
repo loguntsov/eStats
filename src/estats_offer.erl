@@ -8,10 +8,10 @@
 
 -spec new() -> offer_info.
 new() -> #offer_info{
-  count = estats_report:new(),
-  affiliates = estats_report:new(),
-  subid = estats_report:new(),
-  domain = estats_report:new(),
-  referer = estats_report:new()
+  count = estats_gen_report:new(),
+  affiliates = estats_gen_report:new(),
+  subid = estats_gen_report:new(),
+  domain = estats_gen_report:new(),
+  referer = estats_gen_report:new()
 }.
 

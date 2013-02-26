@@ -1,4 +1,5 @@
 
+-include("include/types.hrl").
 
 -record(click_info,{
   id :: integer(), % ID клика INT
@@ -13,6 +14,8 @@
   domain :: binary(),
   user_agent :: binary(),
   ip :: binary(),
+  date :: date(),
+  day_number :: integer(), % Номер дня начиная с 0 года н.э.
   year :: integer(),
   month :: integer(),
   day :: integer(),
