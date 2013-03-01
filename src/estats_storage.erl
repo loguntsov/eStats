@@ -51,7 +51,7 @@ handle_call({set, Key, Value}, _From, State) ->
 handle_call({get, Key}, _From, State) ->
   { reply,
     case dets:lookup(State#state.set, Key) of
-    [ ] -> none;
+    [ ] -> undefined;
     [ A ] -> { _, Value } = A, Value
     end,
     State };

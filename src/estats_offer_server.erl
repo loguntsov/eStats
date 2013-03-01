@@ -1,7 +1,7 @@
 %% Copyright
 -module(estats_offer_server).
 
--export([click/2, start_link/0, state/1, report/5, pid/0]).
+-export([click/2, start_link/1, state/1, report/5, pid/0]).
 
 -include("include/click_info.hrl").
 -include("include/offer_info.hrl").
@@ -13,25 +13,18 @@
 -export([send_report_query/4]).
 
 -record(state, {
-  reports :: dict(), % {Report_module(), pid()
+  reports_sup :: pid(),
   is_readonly :: boolean()
 }).
 
-init({}) ->
+init({Path}) ->
   gproc:add_local_name(offer_server),
+  { ok , Pid } = estats_report_sup:start_link([estats_report_count], Path, write),
   {ok, #state{
-  reports = dict:from_list(lists:map(
-    fun(Report_module) ->
-      { ok, Pid } = estats_gen_report:start_link(Report_module),
-      {Report_module, Pid}
-    end, [ estats_report_count ])),
-  is_readonly = false
-}};
+    reports_sup = Pid,
+    is_readonly = false
+}}.
 
-init({readonly}) -> {ok, #state{
-  reports = dict:new(),
-  is_readonly = true
-} }.
 
 pid() ->
   gproc:lookup_local_name(offer_server).
@@ -55,30 +48,31 @@ report(Pid, Report_module, Type, Period, Query) ->
     {error, timeout}
   end.
 
--spec start_link() -> {ok, pid() }.
-start_link() ->
-  gen_server:start_link(?MODULE, {}, []).
+-spec start_link(Path :: string()) -> {ok, pid() }.
+start_link(Path) ->
+  gen_server:start_link(?MODULE, {Path}, []).
 
 %% Обработка клика
 handle_call({click, Click}, _From, State) ->
   case State#state.is_readonly of
     false ->
-      dict:map(fun(_Report_module, Pid) ->
+      lists:map(fun(Pid) ->
         ok = estats_gen_report:click(Pid, Click)
-      end, State#state.reports),
+      end, estats_report_sup:pids(State#state.reports_sup)),
       {reply, ok, State};
     true -> { reply, {error, readonly}, State }
   end;
 
-handle_call( state, _From, State ) -> { reply, State#state.reports, State };
+handle_call( state, _From, State ) -> { reply, estats_report_sup:list(State#state.reports_sup), State };
 handle_call(_,_, State ) -> { noreply, State }.
 
 %% Выдача отчета
 handle_cast({report, From, Ref, {Report_module, Query } }, State) ->
-  case dict:find(Report_module, State#state.reports) of
-    error -> From!{report_error, Ref, report_module_not_found};
-    {ok, ReportPid } ->
-      spawn_link(?MODULE, send_report_query, [ From, Ref, ReportPid, Query ])
+  case estats_report_sup:pid_module(Report_module) of
+    { ok, ReportPid } ->
+        spawn_link(?MODULE, send_report_query, [ From, Ref, ReportPid, Query ]);
+    { error, undefined } ->
+        report_error(From, Ref, report_module_not_found)
   end,
   {noreply, State}.
 
@@ -93,17 +87,23 @@ send_report_query(From, Ref, ReportPid, {Type, Period, Query}) ->
     end,
     case estats_gen_report:report(ReportPid, {Type, Date_list, Query}) of
       {ok, Result } -> From!{report_answer, Ref, Result};
-      {error, Reason } -> From!{report_error, Ref, Reason}
+      {error, Reason } -> report_error(From, Ref, Reason)
     end
   catch
-    error:Reason_error -> From!{report_error, Ref, Reason_error}
+    error:Reason_error -> report_error(From, Ref, Reason_error)
   end.
+
+report_error(Pid, Ref, Reason) ->
+  Pid!{report_error, Ref, Reason}.
 
 handle_info(_, State) -> { noreply, State }.
 
 code_change(_, State, _) -> { ok, State}.
 
 terminate(_, _) -> ok.
+
+
+
 
 
 %% -spec parse_sql_date(Date) -> { Year, Month, Day, Hour, Minutes, Sec } | false.

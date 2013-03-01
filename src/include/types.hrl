@@ -10,6 +10,6 @@
 -type( hour() :: 0..23).
 -type( date_period() :: { From :: date(), To :: date() }).
 -type( date_list() :: [ date() ]).
-
+-type( proplist() :: [ { Key :: term(), Value :: term() } ]).
 -endif. % TYPES_HRL
 

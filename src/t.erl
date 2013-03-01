@@ -8,10 +8,10 @@
 -export([t/0, t0/1, t1/2,t2/2]).
 
 t() ->
-  clicks(estats_offer_server:pid(), 10000),
+  clicks(estats_offer_server:pid(), 100000).
 
-  Pid = gproc:lookup_local_name(estats_report_count),
-  gen_server:call(Pid, state).
+  %Pid = gproc:lookup_local_name({estats_report_count, write}),
+  %gen_server:call(Pid, state)
 
 t0(Query) ->
   estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_of_offer, [{2013,2,20}] , Query).
@@ -27,10 +27,15 @@ clicks(_Pid, 0) -> ok;
 
 clicks(Pid, N) ->
   estats_offer_server:click(Pid, random_click()),
+  Rand = random:uniform(5),
+  if
+    Rand < 2 -> ok; %timer:sleep(1);
+    true -> ok
+  end,
   clicks(Pid, N-1).
 
 random_click() ->
-  Date = { 2013, 2, 20 },
+  Date = { 2013, random:uniform(2), random:uniform(28) },
   #click_info {
   id = random:uniform(10000),
   transaction_id = <<"">>,
