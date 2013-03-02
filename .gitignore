@@ -1,4 +1,6 @@
 .idea
 /ebin
 /deps
+estats.conf
 *.beam
+/*.dump

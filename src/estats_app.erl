@@ -19,7 +19,7 @@ start(_Type, _StartArgs) ->
 	{ok, [Options]} = file:consult("estats.conf"),
 	{ok, Pid} = supervisor:start_link(?MODULE, Options),
 	io:format("eStats started\n"),
-  spawn_link(fun() -> t:t(), io:format("eStats inited\n") end),
+  %spawn_link(fun() -> t:t(), io:format("eStats inited\n") end),
 	{ok, Pid}.
 
 %%----------------------------------------------------------------------
@@ -28,14 +28,12 @@ start(_Type, _StartArgs) ->
 %%----------------------------------------------------------------------
 stop(_State) -> ok.
 
-init(_Options) ->
+init(Options) ->
+  {redis, Redis } = proplists:lookup( redis, Options ),
+  {path, Path} = proplists:lookup( path, Options),
 	{ ok, {{one_for_one, 1, 1000}, [
-    {estats_storage, { estats_storage, start_link, [ ] }, permanent, 5000 , worker, [] },
-    {estats_offer_server, { estats_offer_server, start_link, [ "data" ] }, permanent, 5000 , worker, [] }
-%		{ecsaver_pool, { ecsaver, pool_start, [ Save_process ] }, permanent, 5000 , supervisor, [] },
-%		{ectable_sup, { ectable_sup, start_link, [ server_id, Tables, Save_time*1000, Command ] }, permanent, 5000 , supervisor, [] },
-%		{ecserver_sup, { ecserver_sup, start_link, [ server_id, Servers, Tables ] }, permanent, 5000 , supervisor, dynamic },
-%		{udp_server_sup, { udp_server_sup, start_link, [ server_id, Servers, element(1,Port_range), element(2, Port_range)] }, permanent, 5000 , supervisor, dynamic }
+    { estats_storage, { estats_storage, start_link, [ ] }, permanent, 5000 , worker, [] },
+    { estats_sub_server, { estats_sub_server, start_link, [{redis, Redis}, Path] }, permanent, 5000, worker, [] }
 	]}}.
 
 

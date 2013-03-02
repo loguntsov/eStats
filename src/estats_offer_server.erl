@@ -25,6 +25,7 @@ init({Path}) ->
     is_readonly = false
 }}.
 
+
 -spec pid() -> pid().
 pid() ->
   gproc:lookup_local_name(offer_server).

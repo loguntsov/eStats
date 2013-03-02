@@ -38,7 +38,6 @@ random_click() ->
   Date = { 2013, random:uniform(2), random:uniform(28) },
   #click_info {
   id = random:uniform(10000),
-  transaction_id = <<"">>,
   offer_id = random:uniform(30),
   offer_url_id = random:uniform(30),
 % banner id (не реализовано)
