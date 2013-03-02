@@ -25,7 +25,7 @@ init({Path}) ->
     is_readonly = false
 }}.
 
-
+-spec pid() -> pid().
 pid() ->
   gproc:lookup_local_name(offer_server).
 
@@ -68,7 +68,7 @@ handle_call(_,_, State ) -> { noreply, State }.
 
 %% Выдача отчета
 handle_cast({report, From, Ref, {Report_module, Query } }, State) ->
-  case estats_report_sup:pid_module(Report_module) of
+  case estats_report_sup:pid_module(State#state.reports_sup, Report_module) of
     { ok, ReportPid } ->
         spawn_link(?MODULE, send_report_query, [ From, Ref, ReportPid, Query ]);
     { error, undefined } ->

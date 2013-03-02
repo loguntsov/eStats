@@ -80,7 +80,17 @@ handle_call({report, {Type, Period, Query } }, _From, State_main) ->
         end
       end, { State_main, dict:new() },Period),
 
-    Collector = lists:mapfoldl(fun({Report, Dates}, Acc) ->
+%% Последовательное выполнение запросов
+%%     Result = lists:map(fun({Report, Dates}) ->
+%%       try
+%%         (NewState#state.report_module):handle_report({Type, Dates, Query } , Report)
+%%       catch
+%%         error:function_clause -> { error, report_unknown }
+%%       end
+%%     end, dict:to_list(Reports)),
+
+%% Параллельное выполнение запросов
+    {Collector, _ } = lists:mapfoldl(fun({Report, Dates}, Acc) ->
       { { Acc, { Report, NewState#state.report_module, {Type, Dates, Query } } }, Acc+1 }
     end,0,dict:to_list(Reports)),
 
@@ -88,12 +98,24 @@ handle_call({report, {Type, Period, Query } }, _From, State_main) ->
       try
         Module:handle_report(QueryAll, Report)
       catch
-        error:function_clause -> { error, report_unknown };
-        error:Reason ->  { error, Reason }
+        error:function_clause -> { error, report_unknown }
       end
     end, Collector),
 
-    {reply, Result , NewState};
+    R = case Result of
+      {ok, Ret } ->
+        List = [ { Cols, Local_result } || { _ , { ok, Cols, Local_result } } <- Ret ],
+        [ { Cols_settings, _ } | _ ] = List,
+
+        List1 = lists:usort(lists:concat([ Item || { _, Item } <- List])),
+        R1 = case Cols_settings of
+          Group when is_integer(Group) ->
+            estats_report:group(Group, List1)
+        end,
+        { ok, R1 };
+      {error, Reason } -> { error, Reason }
+    end,
+    {reply, R , NewState};
 
 handle_call( state, _From, State) ->
   {reply, State , State}.

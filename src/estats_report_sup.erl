@@ -16,7 +16,7 @@ start_link(Report_modules, Path, Mode) ->
 
 %% supervisor callbacks
 init({Reports_modules, Path, Mode}) ->
-  {ok, {{one_for_one, 5, 10}, [
+  {ok, {{one_for_one, 1, 10}, [
     { Module , { estats_gen_report, start_link, [ Module, Path, Mode ] }, permanent, 100000, worker  , dynamic } || Module <-Reports_modules ]
   }}.
 

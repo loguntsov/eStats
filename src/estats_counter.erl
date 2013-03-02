@@ -22,6 +22,6 @@ inc(Table, Key, Step) ->
 get_value(Table, Key) ->
   case dets:lookup(Table, Key) of
     [ ] -> 0;
-    [ { Key, Value, _ }] -> Value
+    [ { Key, Value }] -> Value
   end.
 

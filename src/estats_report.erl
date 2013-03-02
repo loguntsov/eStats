@@ -89,14 +89,12 @@ files_size(Report) when is_record(Report, report_info) ->
 files_size(Path) when is_list(Path) ->
   case file:list_dir(Path) of
     {ok , Filenames } ->
-      lists:sum(lists:map(fun(Filename) ->
-        case file:read_file_info(Filename) of
-          { ok, Info } when is_record(Info, file_info) ->
-            Info#file_info.size;
-          _ -> 0
-        end
-      end, Filenames));
-    { error, _Reason } -> undefined
+      FilesSize = lists:sum(lists:map(fun(Filename) ->
+        { ok, Info } = file:read_file_info(lists:concat([Path, "/", Filename])),
+        Info#file_info.size
+      end, Filenames)),
+      {ok, FilesSize};
+    { error, _Reason } -> { error, undefined }
   end.
 
 
@@ -123,7 +121,7 @@ counter_get(Report, Key) ->
   estats_counter:get_value(Report#report_info.counters, Key).
 
 counters_list_get(Report, Keys) ->
-  [ { Key , counter_get(Report, Key) } || Key <- Keys ].
+  [ { Key, counter_get(Report, Key) } || Key <- Keys ].
 
 % Построение ключа на основе ключа и подключа
 %subkey(Key, Subkey) when is_tuple(Key) ->

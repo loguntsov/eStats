@@ -29,7 +29,7 @@ start(_Type, _StartArgs) ->
 stop(_State) -> ok.
 
 init(_Options) ->
-	{ ok, {{one_for_one, 5, 1000}, [
+	{ ok, {{one_for_one, 1, 1000}, [
     {estats_storage, { estats_storage, start_link, [ ] }, permanent, 5000 , worker, [] },
     {estats_offer_server, { estats_offer_server, start_link, [ "data" ] }, permanent, 5000 , worker, [] }
 %		{ecsaver_pool, { ecsaver, pool_start, [ Save_process ] }, permanent, 5000 , supervisor, [] },

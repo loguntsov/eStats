@@ -101,19 +101,9 @@ loop_1(State) ->
 loop_2() ->
   receive
     {init, { Pid, Ref, { Key, Func, Data } } } ->
-      Result = try
-        {ok, Func(Data)}
-      catch
-        Error:Reason -> { Error, Reason }
-      end,
-      Pid ! { answer, Ref, {Key, Result } };
+      Pid ! { answer, Ref, {Key, Func(Data) } };
     {init, { Pid, Ref, { Func, Data } } } ->
-      Result = try
-        {ok, Func(Data)}
-      catch
-        Error:Reason -> { Error, Reason }
-      end,
-      Pid ! { answer, Ref, Result };
+      Pid ! { answer, Ref, Func(Data) };
     _ -> error
   after 10000 ->
     error

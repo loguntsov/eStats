@@ -32,7 +32,7 @@ handle_report({affiliates_hour_count, Period, { Offer, Affiliate } }, Report) wh
   {ok, 3,
     [ { estats_report:subkey_swap(Key, [2, 1, 4, 3]), Value } || {Key, Value} <-
         estats_report:counters_list_get(Report,
-          estats_gen_report:subkey_list(
+          estats_report:subkey_list(
             [Period, Offer, Affiliate, lists:seq(0,23) ])
         )
     ]

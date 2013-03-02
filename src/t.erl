@@ -5,31 +5,31 @@
 -include("include/offer_info.hrl").
 
 %% API
--export([t/0, t0/1, t1/2,t2/2]).
+-export([t/0, t0/2, t1/3, t2/3]).
 
 t() ->
-  clicks(estats_offer_server:pid(), 100000).
+  clicks(estats_offer_server:pid(), 10000).
 
   %Pid = gproc:lookup_local_name({estats_report_count, write}),
   %gen_server:call(Pid, state)
 
-t0(Query) ->
-  estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_of_offer, [{2013,2,20}] , Query).
+t0(Date, Query) ->
+  estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_of_offer, Date , Query).
 
-t1(Offer, Affiliate) ->
-  estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_hour_count, {2013,2,20} , {Offer, Affiliate}).
+t1(Date, Offer, Affiliate) ->
+  estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_hour_count, Date , {Offer, Affiliate}).
 
-t2(Offer, Affiliate) ->
-  estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_day_count, {2013,2,20} , {Offer, Affiliate}).
+t2(Date, Offer, Affiliate) ->
+  estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_day_count, Date , {Offer, Affiliate}).
 
 
 clicks(_Pid, 0) -> ok;
 
 clicks(Pid, N) ->
   estats_offer_server:click(Pid, random_click()),
-  Rand = random:uniform(5),
+  Rand = random:uniform(10),
   if
-    Rand < 2 -> ok; %timer:sleep(1);
+    Rand < 2 -> timer:sleep(1);
     true -> ok
   end,
   clicks(Pid, N-1).
