@@ -10,7 +10,7 @@
 
 -behaviour(gen_server).
 
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3,terminate/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
 -record(state,{
   reports :: dict(),
@@ -24,16 +24,12 @@
 -define(REPORT_MAX_SIZE, 536870912). % Максимальный размер файлов отчета за период (512 мб)
 -define(REPORT_MAX_DATE_LENGHT, 7). % Максимальное кол-во дней в одном файле отчете (в периоде)
 
--export([behaviour_info/1]).
+-callback handle_click(Click :: click_info, Report :: report_info) ->
+  ok.
 
-behaviour_info(callbacks) ->
-  [{handle_click,2},
-    {handle_report, 2}
-  ];
-
-behaviour_info(_Other) ->
-  undefined.
-
+-callback handle_report(Query :: term(), Report :: report_info) ->
+  { ok, Group :: integer(), [ { Key :: list(), Value :: integer() } ] } |
+  { error, Reason :: term() }.
 
 init({Module, Path, Mode}) ->
   %process_flag(trap_exit, true),
