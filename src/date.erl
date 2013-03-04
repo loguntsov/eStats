@@ -5,7 +5,9 @@
 -include("include/types.hrl").
 
 %% API
--export([year/1, month/1, day/1, is_valid/1, gregorian_days/1, period_to_list/1, next_days/2, between/2, to_string/1, to_string/2]).
+-export([year/1, month/1, day/1, is_valid/1, gregorian_days/1, period_to_list/1, next_days/2, between/2, to_string/1, to_string/2,
+  to_proplists/1, from_proplists/1, proplists_is_date/1
+]).
 
 -spec year(Date :: date()) -> integer().
 year({Year, _ , _ }) -> Year.
@@ -61,4 +63,27 @@ to_string({Year, Month, Day}, Delimiter) ->
 
 to_string(Date) ->
   to_string(Date, "-").
+
+from_proplists(Proplist) ->
+  Year = proplists:lookup( year, Proplist),
+  Month = proplists:lookup( month, Proplist),
+  Day = proplist:lookup(day, Proplist),
+  Date = { Year, Month, Day },
+  case is_valid(Date) of
+    true -> Date;
+    false -> throw({error, is_not_date, Proplist})
+  end.
+
+to_proplists({Year, Month, Day}) ->
+  [ { year, Year }, { month, Month }, { day, Day } ].
+
+proplists_is_date(Proplists) ->
+  try
+    true = proplists:is_defined(year, Proplists),
+    true = proplists:is_defined(year, Proplists),
+    true = proplists:is_defined(year, Proplists),
+    true
+  catch
+    error:badmatch -> false
+  end.
 
