@@ -87,12 +87,16 @@ echo(Json, Req) ->
       end
     end, Input))),
 
-    Data = [ {format_key(Key, Output), Value } || { Key, Value } <- lists:usort(
-      case estats_offer_server:report(estats_offer_server:pid(), Module, Type, Period, QueryTuple ) of
-        {error, Reason} -> throw({error, report_answer, Reason});
-        {ok, D} -> D
-      end
-    )],
+    Data = [ case Item of
+        { Key, Value } -> {format_key(Key, Output), Value };
+        X -> X
+      end || Item <- lists:usort(
+        case estats_offer_server:report(estats_offer_server:pid(), Module, Type, Period, QueryTuple ) of
+          {error, Reason} -> throw({error, report_answer, Reason});
+          {ok, D} -> D
+        end
+      )
+    ],
 
 
     BeforeJson = estats_report:group([ erlang:atom_to_binary(Item, utf8) || Item <- Output], Data),
@@ -119,9 +123,9 @@ echo(Json, Req) ->
     throw:{error, report_answer, R} ->
       reply_html(Json, <<"Отчет вернул следующую ошибку: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req);
     throw:{error, query_property_not_found, Prop} ->
-      reply_html(Json, <<"Для данного отчета могу найти требуемое поле в запросе: ", Prop/binary >>, Req);
-    error:R ->
-      reply_html(Json, <<"В процессе обработки ошибки возникла следующая ошибка: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req)
+      reply_html(Json, <<"Для данного отчета могу найти требуемое поле в запросе: ", Prop/binary >>, Req)
+%    error:R ->
+%      reply_html(Json, <<"В процессе обработки ошибки возникла следующая ошибка: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req)
   end.
 
 terminate(_Reason, _Req, _State) ->

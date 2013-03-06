@@ -208,7 +208,9 @@ group([], Data) -> Data;
 group([ Label ], Data ) when is_list(Data) ->
   [ case Item of
       { [ A ], B } -> [{ Label, A }, { <<"value">>, B }];
-      { A, B } -> [{ Label, A }, { <<"value">>, B }]
+      { A, B } -> [{ Label, A }, { <<"value">>, B }];
+      A when is_integer(A) -> A;
+      B when is_binary(B) -> B
     end || Item <- Data];
 group([Label | Labels], Data ) ->
 
