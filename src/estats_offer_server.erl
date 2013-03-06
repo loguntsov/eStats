@@ -103,27 +103,3 @@ code_change(_, State, _) -> { ok, State}.
 
 terminate(_, _) -> ok.
 
-
-
-
-
-%% -spec parse_sql_date(Date) -> { Year, Month, Day, Hour, Minutes, Sec } | false.
-%% parse_sql_date(Date) ->
-%%   try
-%%     <<Year:4/binary-unit:8,
-%%       _:1/binary-unit:8,
-%%       Month:2/binary-unit:8,
-%%       _:1/binary-unit:8,
-%%       Day:2/binary-unit:8,
-%%       _:1/binary-unit:8,
-%%       Hour:2/binary-unit:8,
-%%       _:1/binary-unit:8,
-%%       Minutes:2/binary-unit:8,
-%%       _:1/binary-unit:8,
-%%       Sec:2/binary-unit:8,
-%%       _/binary>> = Date of
-%%       _ -> { Year, Month, Day, Hour, Minutes, Sec }
-%%   catch
-%%       _ -> false
-%% end.
-

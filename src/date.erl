@@ -6,7 +6,7 @@
 
 %% API
 -export([year/1, month/1, day/1, is_valid/1, gregorian_days/1, period_to_list/1, next_days/2, between/2, to_string/1, to_string/2,
-  to_proplists/1, from_proplists/1, proplists_is_date/1
+  to_proplists/1, from_proplists/1, proplists_is_date/1, to_binary/1, to_binary/2,from_sql_binary/1
 ]).
 
 -spec year(Date :: date()) -> integer().
@@ -65,9 +65,9 @@ to_string(Date) ->
   to_string(Date, "-").
 
 from_proplists(Proplist) ->
-  Year = proplists:lookup( year, Proplist),
-  Month = proplists:lookup( month, Proplist),
-  Day = proplist:lookup(day, Proplist),
+  {year, Year } = proplists:lookup(year, Proplist),
+  {month,Month } = proplists:lookup(month, Proplist),
+  {day, Day } = proplist:lookup(day, Proplist),
   Date = { Year, Month, Day },
   case is_valid(Date) of
     true -> Date;
@@ -87,3 +87,22 @@ proplists_is_date(Proplists) ->
     error:badmatch -> false
   end.
 
+to_binary({Year, Month, Day}, Delimiter) ->
+  << (erlang:integer_to_binary(Year))/binary,
+  Delimiter/binary,
+  (erlang:integer_to_binary(Month))/binary,
+  Delimiter/binary,
+  (erlang:integer_to_binary(Day))/binary >>.
+
+to_binary({Year, Month, Day}) ->
+  to_binary({Year, Month, Day}, <<"-">>).
+
+-spec from_sql_binary(Date :: binary()) -> date().
+from_sql_binary(Binary) when is_binary(Binary) ->
+    <<Year:4/binary-unit:8,
+      _:1/binary-unit:8,
+      Month:2/binary-unit:8,
+      _:1/binary-unit:8,
+      Day:2/binary-unit:8
+      >> = Binary,
+     { erlang:binary_to_integer(Year), erlang:binary_to_integer(Month), erlang:binary_to_integer(Day) }.

@@ -8,13 +8,13 @@
 -export([t/0, t0/2, t1/3, t2/3]).
 
 t() ->
-  clicks(estats_offer_server:pid(), 10000).
+  clicks(estats_offer_server:pid(), 100000).
 
   %Pid = gproc:lookup_local_name({estats_report_count, write}),
   %gen_server:call(Pid, state)
 
 t0(Date, Query) ->
-  estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_of_offer, Date , Query).
+  estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_by_offer, Date , { Query }).
 
 t1(Date, Offer, Affiliate) ->
   estats_offer_server:report(estats_offer_server:pid(), estats_report_count, affiliates_hour_count, Date , {Offer, Affiliate}).
@@ -27,7 +27,7 @@ clicks(_Pid, 0) -> ok;
 
 clicks(Pid, N) ->
   estats_offer_server:click(Pid, random_click()),
-  Rand = random:uniform(10),
+  Rand = random:uniform(5),
   if
     Rand < 2 -> timer:sleep(1);
     true -> ok

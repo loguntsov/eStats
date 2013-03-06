@@ -31,7 +31,7 @@ init({}) ->
 put(Key, Value) ->
   call({set, Key, Value }).
 
--spec get(Key :: term()) -> Value :: term() | none.
+-spec get(Key :: term()) -> Value :: term() | undefined.
 get(Key) ->
   call({get, Key}).
 
@@ -52,7 +52,7 @@ handle_call({get, Key}, _From, State) ->
   { reply,
     case dets:lookup(State#state.set, Key) of
     [ ] -> undefined;
-    [ A ] -> { _, Value } = A, Value
+    [ { _, Value } ] ->  Value
     end,
     State };
 

@@ -31,6 +31,8 @@
   { ok, Group :: integer(), [ { Key :: list(), Value :: integer() } ] } |
   { error, Reason :: term() }.
 
+-callback handle_info(Type :: atom()) -> { Property_list :: [ atom() ], Group_list :: [ atom() ] }.
+
 init({Module, Path, Mode}) ->
   %process_flag(trap_exit, true),
   gproc:add_local_name({Module, Mode}),
@@ -66,15 +68,18 @@ handle_cast({click, Click}, State) when State#state.mode =/= readonly ->
   {noreply, NewState}.
 
 handle_call({report, {Type, Period, Query } }, _From, State_main) ->
-    { NewState, Reports } =
-      lists:foldl(fun(Date, { State, Reports }) ->
-        { NewState, Report} = get_report(Date, State),
-        case Report of
-          R when is_record(R, report_info) ->
-            { NewState, dict:append(R, Date, Reports) };
-          _ -> { NewState, Reports }
-        end
-      end, { State_main, dict:new() },Period),
+  error_logger:info_report({{report, {Type, Period, Query } }, State_main}),
+%  {ok, _Input, Output} =(State_main#state.report_module):handle_info(Type),
+
+  { NewState, Reports } =
+    lists:foldl(fun(Date, { State, Reports }) ->
+      { NewState, Report} = get_report(Date, State),
+      case Report of
+        R when is_record(R, report_info) ->
+          { NewState, dict:append(R, Date, Reports) };
+        _ -> { NewState, Reports }
+      end
+    end, { State_main, dict:new() },Period),
 
 %% Последовательное выполнение запросов
 %%     Result = lists:map(fun({Report, Dates}) ->
@@ -94,21 +99,18 @@ handle_call({report, {Type, Period, Query } }, _From, State_main) ->
       try
         Module:handle_report(QueryAll, Report)
       catch
-        error:function_clause -> { error, report_unknown }
+        error:function_clause -> { error, report_unknown, QueryAll }
       end
     end, Collector),
 
     R = case Result of
       {ok, Ret } ->
-        List = [ { Cols, Local_result } || { _ , { ok, Cols, Local_result } } <- Ret ],
-        [ { Cols_settings, _ } | _ ] = List,
-
-        List1 = lists:usort(lists:concat([ Item || { _, Item } <- List])),
-        R1 = case Cols_settings of
-          Group when is_integer(Group) ->
-            estats_report:group(Group, List1)
-        end,
-        { ok, R1 };
+        {ok, lists:concat(
+              lists:map(
+                fun({ _, {ok, Local_result} }) -> Local_result end,
+              Ret )
+             )
+        };
       {error, Reason } -> { error, Reason }
     end,
     {reply, R , NewState};
@@ -148,9 +150,9 @@ get_report_from_storage(Date, State) ->
   Path = case estats_storage:get(Key) of
     undefined ->
       case find_prev_report(Date, State, ?REPORT_MAX_DATE_LENGHT ) of
-        undefined ->
+        undefined when State#state.mode =/= readonly ->
           make_report(Date, State);
-        P -> { ok, P }
+        P -> P
       end;
     P -> {ok, P}
   end,
@@ -161,11 +163,28 @@ get_report_from_storage(Date, State) ->
         },
         undefined
       };
-    { ok, Path1 } ->
+    { ok, undefined } ->
+      { State, undefined };
+    { ok, Ref } when is_reference(Ref) ->
+      { State#state{
+          dates = dict:store(Date, Ref, State#state.dates)
+        },
+        dict:fetch(Ref, State#state.reports)
+      };
+    { ok, Path1 } when is_list(Path1) ->
       {ok, Report } = estats_report:open(Path1, State#state.report_mode),
       Ref = make_ref(),
       { State#state{
           dates = dict:store(Date, Ref, State#state.dates),
+          reports = dict:store(Ref, Report, State#state.reports)
+        },
+        Report
+      };
+    { ok, ReportMainDate, Path1 } when is_list(Path1) ->
+      {ok, Report } = estats_report:open(Path1, State#state.report_mode),
+      Ref = make_ref(),
+      { State#state{
+          dates = dict:store(Date, Ref, dict:store(ReportMainDate, Ref, State#state.dates)),
           reports = dict:store(Ref, Report, State#state.reports)
         },
         Report
@@ -184,26 +203,25 @@ find_prev_report(_Date, _State, 0) -> undefined;
 find_prev_report(Date, State, Limit) ->
   NewDate = date:next_days(Date, -1),
   Key = get_storage_key(NewDate, State),
-  Path = case estats_storage:get(Key) of
+  case estats_storage:get(Key) of
     undefined -> find_prev_report(NewDate, State, Limit -1);
-    P -> P
-  end,
-
-  if
-    is_list(Path) ->
-      case estats_report:files_size(Path) of
-        {ok , Size } ->
-          if
-              Size < ?REPORT_MAX_SIZE -> Path;
-              true -> undefined
-          end;
-        _ -> undefined
-      end;
-    true -> undefined
+    Path when is_list(Path) ->
+      case dict:find(NewDate, State#state.dates) of
+        { ok, Ref } when is_reference(Ref)-> { ok, Ref };
+        error ->
+          case  estats_report:files_size(Path) of
+            {ok, Size } ->
+              if
+                Size < ?REPORT_MAX_SIZE -> {ok, NewDate, Path};
+                true -> undefined
+              end;
+            _ -> undefined
+          end
+      end
   end.
 
-
 get_storage_key(Date, State) ->
+  error_logger:info_report({report, State#state.report_module, Date}),
   {report, State#state.report_module, Date}.
 
 make_report_dir([]) -> { error, enoent};

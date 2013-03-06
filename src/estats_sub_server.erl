@@ -25,10 +25,10 @@ start_link(Redis, Offer_server) ->
 }).
 
 init({{redis, Redis}, Offer_server}) ->
-  {ok, Sub} = eredis:start_link(Redis),
+  {ok, Sub} = { ok, none }, %% eredis:start_link(Redis),
   {ok, Offer } = estats_offer_server:start_link(Offer_server),
   {queue, Queue } = proplists:lookup(queue, Redis),
-  tick_init(),
+  %tick_init(), Временно не принимаем данные
   {ok, #state{
     redis_pid = Sub,
     offer_pid = Offer,
