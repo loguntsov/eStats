@@ -27,11 +27,7 @@ clicks(_Pid, 0) -> ok;
 
 clicks(Pid, N) ->
   estats_offer_server:click(Pid, random_click()),
-  Rand = random:uniform(5),
-  if
-    Rand < 2 -> timer:sleep(1);
-    true -> ok
-  end,
+  timer:sleep(5),
   clicks(Pid, N-1).
 
 random_click() ->
