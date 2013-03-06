@@ -33,15 +33,24 @@ echo(<<"">>, Req) ->
 
 echo(Json, Req) ->
   try
-    Proplist = jsx:decode(Json),
+    Proplist = try
+      jsx:decode(Json)
+    catch
+      error:badarg ->
+        throw({error, json_bad})
+    end,
     Module = erlang:binary_to_existing_atom(<<"estats_report_", (get_property(module, Proplist))/binary >>, utf8),
     case module_is_report(Module) of
       true -> ok;
       false -> throw({error, module_is_not_report})
     end,
 
-    Type = erlang:binary_to_existing_atom(get_property(type, Proplist), utf8),
-    {Input, _Output} = try
+    Type = try
+      erlang:binary_to_existing_atom(get_property(type, Proplist), utf8)
+    catch
+      error:badarg -> throw({error, type_not_recognized})
+    end,
+    {Input, Output} = try
       {ok, In, Out} = Module:handle_info(Type),
       {In, Out}
     catch
@@ -53,11 +62,13 @@ echo(Json, Req) ->
       [{<<"begin">>, DateBin_begin},{<<"end">>,DateBin_end}] when is_binary(DateBin_begin), is_binary(DateBin_end) ->
         DateBegin = date:from_sql_binary(DateBin_begin),
         DateEnd = date:from_sql_binary(DateBin_end),
-        date:period_to_list({DateBegin, DateEnd});
+        {ok, Date} = date:period_to_list({DateBegin, DateEnd}),
+        Date;
       [{<<"begin">>, DateBin_begin},{<<"end">>,DateBin_end}] when is_list(DateBin_begin), is_list(DateBin_end)->
         DateBegin = date:from_proplists(DateBin_begin),
         DateEnd = date:from_proplists(DateBin_end),
-        date:period_to_list({DateBegin, DateEnd});
+        {ok, Date} = date:period_to_list({DateBegin, DateEnd}),
+        Date;
       [ Element | _ ] = List when is_list(List), is_binary(Element) ->
         [ date:from_sql_binary(X) || X <- List ];
       [ Element | _ ] = List when is_list(List), is_list(Element) ->
@@ -66,7 +77,7 @@ echo(Json, Req) ->
 
     Query = get_property('query', Proplist),
 
-    QueryTuple = list_to_tuple(lists:map(fun(Name) ->
+    QueryTuple = list_to_tuple(lists:reverse(lists:map(fun(Name) ->
       Param = erlang:atom_to_binary(Name, utf8),
       try
         { Param, Value } = proplists:lookup(Param, Query),
@@ -74,23 +85,31 @@ echo(Json, Req) ->
       catch
         error:{badmatch,none} -> throw({error, query_property_not_found, Param})
       end
-    end, Input)),
+    end, Input))),
 
-    Data = lists:usort(
+    Data = [ {format_key(Key, Output), Value } || { Key, Value } <- lists:usort(
       case estats_offer_server:report(estats_offer_server:pid(), Module, Type, Period, QueryTuple ) of
         {error, Reason} -> throw({error, report_answer, Reason});
         {ok, D} -> D
       end
-    ),
+    )],
 
 
-    Answer = Data, %% estats_report:group(length(Output) -1, Data),
+    BeforeJson = estats_report:group([ erlang:atom_to_binary(Item, utf8) || Item <- Output], Data),
 
-    Msg = list_to_binary(lists:flatten(io_lib:format("~p",[Answer]))),
-    reply_html(Json, Msg, Req)
+    Answer = try
+      jsx:encode(BeforeJson)
+    catch
+      error:badarg ->
+        throw({error, bad_answer_for_json, BeforeJson})
+    end,
+
+    reply_html(Json, Answer, Req)
   catch
-    error:badarg ->
+    throw:{error, json_bad} ->
       reply_html(Json, <<"Неверный формат JSON">>, Req);
+    throw:{error, bad_answer_for_json, R} ->
+      reply_html(Json, <<"Немогу преборазовать ответ в JSON: ", (list_to_binary(io_lib:format("~p",[R])))/binary >>, Req);
     throw:{error, property_not_exists, Name } ->
        reply_html(Json, <<"В запросе необходимо поле ", (erlang:atom_to_binary(Name))/binary >>, Req);
     throw:{error, module_is_not_report} ->
@@ -100,7 +119,9 @@ echo(Json, Req) ->
     throw:{error, report_answer, R} ->
       reply_html(Json, <<"Отчет вернул следующую ошибку: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req);
     throw:{error, query_property_not_found, Prop} ->
-      reply_html(Json, <<"Для данного отчета могу найти требуемое поле в запросе: ", Prop/binary >>, Req)
+      reply_html(Json, <<"Для данного отчета могу найти требуемое поле в запросе: ", Prop/binary >>, Req);
+    error:R ->
+      reply_html(Json, <<"В процессе обработки ошибки возникла следующая ошибка: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req)
   end.
 
 terminate(_Reason, _Req, _State) ->
@@ -111,9 +132,9 @@ reply_html(Query, Msg, Req) ->
 
 reply_html(Req) ->
   Q = <<"{\"module\" : \"count\",
- \"type\" : \"affiliates_by_offer\",
+ \"type\" : \"affiliates_hour_count\",
  \"period\" : [\"2013-02-28\"],
- \"query\" : {\"offer_id\" : 1 }
+ \"query\" : {\"offer_id\" : 1, \"affiliate_id\" : 1 }
 }">>,
 
   reply_html(Q,<<"">>, Req).
@@ -144,3 +165,9 @@ module_is_report(Module) ->
     _: _ -> false
   end.
 
+format_key([], _) -> [];
+format_key(_, []) -> [];
+format_key([Key | Keys ], [ Label | Labels ] ) when Label =:= 'date' ->
+  [ date:to_sql_binary(Key) | format_key(Keys, Labels) ];
+format_key([Key | Keys ], [ _Label | Labels ] ) ->
+  [ Key | format_key(Keys, Labels) ].

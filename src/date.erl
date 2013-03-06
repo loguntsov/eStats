@@ -6,7 +6,7 @@
 
 %% API
 -export([year/1, month/1, day/1, is_valid/1, gregorian_days/1, period_to_list/1, next_days/2, between/2, to_string/1, to_string/2,
-  to_proplists/1, from_proplists/1, proplists_is_date/1, to_binary/1, to_binary/2,from_sql_binary/1
+  to_proplists/1, from_proplists/1, proplists_is_date/1, to_binary/1, to_binary/2,from_sql_binary/1, to_sql_binary/1
 ]).
 
 -spec year(Date :: date()) -> integer().
@@ -36,21 +36,25 @@ next_days(Date, Days) ->
   calendar:gregorian_days_to_date(calendar:date_to_gregorian_days(Date) + Days).
 
 -spec period_to_list(Period :: date_period() ) -> {ok, [ date() ]} | { error, Reason :: any()}.
-period_to_list({From, To} = _Period) ->
+period_to_list({From, To}) ->
   Rule1 = is_valid(From),
   Rule2 = is_valid(To),
   Rule3 = is_less(From,To),
   if
     not Rule1  -> {error, datefrom_not_valid };
     not Rule2 -> { error, dateto_not_valid };
-    Rule3 -> period_to_list({To, From});
-    true -> {ok, period_to_list(calendar:date_to_gregorian_days(From),calendar:date_to_gregorian_days(To), [])}
+    not Rule3 -> period_to_list({To, From});
+    true ->
+      Date_from = calendar:date_to_gregorian_days(From),
+      Date_to = calendar:date_to_gregorian_days(To),
+      {ok, period_to_list(Date_from, Date_to - Date_from + 1)}
   end.
 
-period_to_list(Greg_From, Greg_To, Acc ) when Greg_From =:= Greg_To -> [ calendar:gregorian_days_to_date(Greg_From) | Acc];
+period_to_list(_ , Days ) when Days < 1 -> [ ];
 
-period_to_list(Greg_From, Greg_To, Acc ) ->
-  period_to_list(Greg_From + 1, Greg_To, [ calendar:gregorian_days_to_date(Greg_From) | Acc]).
+period_to_list(Greg_From, Days ) ->
+  [ calendar:gregorian_days_to_date(Greg_From) | period_to_list( Greg_From + 1, Days - 1 ) ].
+
 
 between(Date, {Date_from, Date_to } = _Period) ->
   GDate = calendar:date_to_gregorian_days(Date),
@@ -106,3 +110,6 @@ from_sql_binary(Binary) when is_binary(Binary) ->
       Day:2/binary-unit:8
       >> = Binary,
      { erlang:binary_to_integer(Year), erlang:binary_to_integer(Month), erlang:binary_to_integer(Day) }.
+
+to_sql_binary({Year, Month, Day}) ->
+  << (erlang:integer_to_binary(Year))/binary, <<"-">>/binary, (list_to_binary(io_lib:format("~2..0B-~2..0B", [Month, Day])))/binary >>.

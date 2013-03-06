@@ -204,20 +204,21 @@ index_get_all(Report, Key, Subkey_list ) ->
   index_get(Report,subkey_list(Key, Subkey_list)).
 
 
-group(0, Data) -> Data;
-group(_Level, []) -> [];
+group([], Data) -> Data;
+group([ Label ], Data ) when is_list(Data) ->
+  [ case Item of
+      { [ A ], B } -> [{ Label, A }, { <<"value">>, B }];
+      { A, B } -> [{ Label, A }, { <<"value">>, B }]
+    end || Item <- Data];
+group([Label | Labels], Data ) ->
 
-group(Level, Data) ->
-
-  NewLevel = Level - 1,
-
-  [ {Key,
+  [ [ { Label, Key}, { <<"value">>,
     [ case X of
       { [], Value } -> Value;
-      { [Key0], Value} -> {Key0, Value};
+      { [Key0], Value} -> group(Labels, [{Key0,Value}]);
       _ -> X
-    end || X <- group(NewLevel, ValueList)
-    ] } || {Key, ValueList} <- group_pairs(lists:keysort(1,
+    end || X <- group(Labels, ValueList)
+    ] } ] || {Key, ValueList} <- group_pairs(lists:keysort(1,
     [ { Key, { Keys, Value } } || {[ Key | Keys ], Value} <- Data ]
   ))
   ].

@@ -46,7 +46,7 @@ handle_report({affiliates_by_offer, Period, { Offer } }, Report) when is_list(Pe
   };
 
 handle_report({affiliates_hour_count, Period, { Offer, Affiliate } }, Report) when is_list(Period) ->
-  {ok, [ { estats_report:subkey_swap(Key, [2, 3, 4, 5]), Value } || {Key, Value} <-
+  {ok, [ { estats_report:subkey_swap(Key, [4, 2, 5, 3]), Value } || {Key, Value} <-
         estats_report:counters_list_get(Report,
           estats_report:subkey_list(
             [ offer_by_affiliate, Period, Offer, Affiliate, lists:seq(0,23) ])
@@ -55,7 +55,7 @@ handle_report({affiliates_hour_count, Period, { Offer, Affiliate } }, Report) wh
   };
 
 handle_report({affiliates_day_count, Period, { Offer, Affiliate } }, Report) when is_list(Period) ->
-  {ok, [ { estats_report:subkey_swap(Key, [2, 3, 4 ]), Value } || {Key, Value} <-
+  {ok, [ { estats_report:subkey_swap(Key, [4, 2, 3 ]), Value } || {Key, Value} <-
       estats_report:counters_list_get(Report,
         estats_report:subkey_list(
           [ offer_by_affiliate, Period, Offer, Affiliate ])
