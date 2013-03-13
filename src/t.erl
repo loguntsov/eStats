@@ -34,17 +34,17 @@ random_click() ->
   Date = { 2013, random:uniform(2), random:uniform(28) },
   #click_info {
   id = random:uniform(10000),
-  offer_id = random:uniform(30),
-  offer_url_id = random:uniform(30),
+  offer_id = random:uniform(2),
+  offer_url_id = random:uniform(4),
 % banner id (не реализовано)
-  affiliate_id = random:uniform(10),
+  affiliate_id = random:uniform(2),
 % advertiser_id :: integer(), % ID рекламодателя
   subid = dict:from_list([
-    { 1, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>, <<"9">>, <<"10">>, <<"11">>}) },
-    { 2, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>, <<"9">>, <<"10">>, <<"11">>}) },
-    { 3, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>, <<"9">>, <<"10">>, <<"11">>}) },
-    { 4, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>, <<"9">>, <<"10">>, <<"11">>}) },
-    { 5, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>, <<"9">>, <<"10">>, <<"11">>}) }
+    { 1, random_prop({<<"1">>, <<"2">>}) },
+    { 2, random_prop({<<"1">>, <<"2">>}) },
+    { 3, random_prop({<<"1">>, <<"2">>}) },
+    { 4, random_prop({<<"1">>, <<"2">>}) },
+    { 5, random_prop({<<"1">>, <<"2">>}) }
   ]),  % Список subid
   http_referer = <<"http://referer.com/hello/world?hi=123">>,
   domain = <<"referer.com">>,
