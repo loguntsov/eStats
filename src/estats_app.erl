@@ -21,7 +21,6 @@ start(_Type, _StartArgs) ->
 	{ok, [Options]} = file:consult("estats.conf"),
 	{ok, Pid} = supervisor:start_link(?MODULE, Options),
 	io:format("eStats started\n"),
-  %spawn_link(fun() -> t:t(), io:format("eStats inited\n") end),
 	{ok, Pid}.
 
 %%----------------------------------------------------------------------

@@ -25,10 +25,10 @@ start_link(Redis, Offer_server) ->
 }).
 
 init({{redis, Redis}, Offer_server}) ->
-  {ok, Sub} = { ok, none }, %% eredis:start_link(Redis),
+  {ok, Sub} = eredis:start_link(Redis),
   {ok, Offer } = estats_offer_server:start_link(Offer_server),
   {queue, Queue } = proplists:lookup(queue, Redis),
-  %tick_init(), Временно не принимаем данные
+  tick_init(),
   {ok, #state{
     redis_pid = Sub,
     offer_pid = Offer,
@@ -109,7 +109,7 @@ tick_init() ->
 from_binary(Term) when not(is_binary(Term)) -> Term;
 from_binary(Term) ->
   try
-    binary_to_integer(Term)
+    erlang:binary_to_integer(Term, utf8)
   catch
     error:badarg ->
       try
