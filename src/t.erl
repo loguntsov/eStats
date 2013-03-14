@@ -38,7 +38,7 @@ random_click() ->
   offer_url_id = random:uniform(4),
 % banner id (не реализовано)
   affiliate_id = random:uniform(2),
-% advertiser_id :: integer(), % ID рекламодателя
+  advertiser_id = random:uniform(2),
   subid = dict:from_list([
     { 1, random_prop({<<"1">>, <<"2">>}) },
     { 2, random_prop({<<"1">>, <<"2">>}) },
