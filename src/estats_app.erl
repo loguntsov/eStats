@@ -30,7 +30,7 @@ start(_Type, _StartArgs) ->
 stop(_State) -> ok.
 
 init(Options) ->
-  {redis, Redis } = proplists:lookup( redis, Options ),
+  Redis = proplists:get_value( redis, Options ),
   {path, Path} = proplists:lookup( path, Options),
   {http_port, HttpPort} = proplists:lookup( http_port, Options),
 
@@ -43,9 +43,17 @@ init(Options) ->
     {env, [{dispatch, Dispatch}]}
   ]),
 
-	{ ok, {{one_for_one, 1, 1000}, [
+  Childs = lists:merge([ [
     { estats_storage, { estats_storage, start_link, [ ] }, permanent, 5000 , worker, [] },
-    { estats_sub_server, { estats_sub_server, start_link, [{redis, Redis}, Path] }, permanent, 5000, worker, [] }
-	]}}.
+    { estats_offer_server, { estats_offer_server, start_link, [ Path ] }, permanent, 5000 , worker, [] } ],
+    case Redis of
+      undefined -> [];
+      _ ->
+        Connections = [ Redis || _ <- lists:seq(1, proplists:get_value(connections, Redis, 0)) ],
+        [{ estats_redis_sup, { estats_redis_sup, start_link, [ Connections ] }, permanent, 5000, supervisor, []}]
+    end
+  ]),
+
+  { ok, {{one_for_one, 1, 1000}, Childs }}.
 
 

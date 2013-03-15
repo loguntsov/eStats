@@ -123,7 +123,7 @@ echo(Json, Req) ->
     throw:{error, report_answer, R} ->
       reply_html(Json, <<"Отчет вернул следующую ошибку: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req);
     throw:{error, query_property_not_found, Prop} ->
-      reply_html(Json, <<"Для данного отчета могу найти требуемое поле в запросе: ", Prop/binary >>, Req)
+      reply_html(Json, <<"Для данного отчета не могу найти требуемое поле в запросе: ", Prop/binary >>, Req)
 %    error:R ->
 %      reply_html(Json, <<"В процессе обработки ошибки возникла следующая ошибка: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req)
   end.

@@ -15,9 +15,13 @@
 -export([handle_click/2, handle_report/2, handle_info/1]).
 
 handle_click(Click, Report) ->
+  Is_uniq_step = case Click#click_info.is_unique of
+    true -> 1;
+    false -> 0
+  end,
   Hour = Click#click_info.hour,
-  estats_report:counter_inc(Report, [ offer_by_affiliate, Click#click_info.date, Click#click_info.affiliate_id ] , [ Click#click_info.offer_id, Hour ]),
-  estats_report:counter_inc(Report, [ offer_by_affiliate, Click#click_info.date, 0 ] , [ Click#click_info.offer_id , Hour ]),
+  estats_report:counter_inc(Report, [ offer_by_affiliate, Click#click_info.date, Click#click_info.affiliate_id ] , [ Click#click_info.offer_id, Hour ], [ 1, Is_uniq_step ] ),
+  estats_report:counter_inc(Report, [ offer_by_affiliate, Click#click_info.date, 0 ] , [ Click#click_info.offer_id , Hour ], [ 1, Is_uniq_step ]),
   estats_report:index_add(Report, [ affiliate_by_offer, Click#click_info.date, Click#click_info.offer_id ] , [ Click#click_info.affiliate_id ]),
   ok.
 
