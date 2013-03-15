@@ -99,23 +99,16 @@ files_size(Path) when is_list(Path) ->
 
 
 
+counter_inc(Report, Key, Subkey) ->
+  counter_inc(Report, Key, Subkey, 1).
 
+counter_inc( _Report, _Key, [], _Step ) -> ok;
 
-
-counter_inc( Report, Key, [ Index_subkey | Index_key ] , Counter_key) ->
-  index_add(Report, Key, Index_subkey),
-  counter_inc(Report, subkey(Key, Index_subkey), Index_key, Counter_key);
-
-counter_inc( Report, Key, [], Counter_key) ->
-  counter_inc(Report, Key, Counter_key).
-
-counter_inc( _Report, _Key, []) -> ok;
-
-counter_inc(Report, Key, [ Subkey | Subkey_list ]) ->
+counter_inc(Report, Key, [ Subkey | Subkey_list ], Steps) ->
   index_add(Report, Key , Subkey),
   NewKey = subkey(Key, Subkey),
-  estats_counter:inc(Report#report_info.counters, NewKey),
-  counter_inc(Report, NewKey, Subkey_list).
+  estats_counter:inc(Report#report_info.counters, NewKey, Steps),
+  counter_inc(Report, NewKey, Subkey_list, Steps).
 
 counter_get(Report, Key) ->
   estats_counter:get_value(Report#report_info.counters, Key).
