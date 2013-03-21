@@ -18,7 +18,8 @@
   report_module :: atom(),
   mode :: atom(),
   path :: string(),
-  report_mode :: []
+  report_mode :: [],
+  save_interval :: integer()
 }).
 
 -define(REPORT_MAX_SIZE, 536870912). % Максимальный размер файлов отчета за период (512 мб)
@@ -36,6 +37,7 @@
 init({Module, Path, Mode}) ->
   %process_flag(trap_exit, true),
   gproc:add_local_name({Module, Mode}),
+  sync_tick(60),
   {ok, #state{
     report_module = Module,
     reports = dict:new(),
@@ -45,7 +47,8 @@ init({Module, Path, Mode}) ->
     report_mode = [
       { mode , Mode },
       { save_interval, 60 }
-    ]
+    ],
+    save_interval = 60
   }}.
 
 
@@ -68,7 +71,6 @@ handle_cast({click, Click}, State) when State#state.mode =/= readonly ->
   {noreply, NewState}.
 
 handle_call({report, {Type, Period, Query } }, _From, State_main) ->
-  error_logger:info_report({{report, {Type, Period, Query } }, State_main}),
 %  {ok, _Input, Output} =(State_main#state.report_module):handle_info(Type),
 
   { NewState, Reports } =
@@ -117,6 +119,13 @@ handle_call({report, {Type, Period, Query } }, _From, State_main) ->
 
 handle_call( state, _From, State) ->
   {reply, State , State}.
+
+handle_info(sync, State) ->
+  dict:map(fun(_, Report) ->
+    estats_report:sync(Report)
+  end, State#state.reports),
+  sync_tick(State#state.save_interval),
+  { noreply, State };
 
 handle_info(_, State) -> { noreply, State }.
 
@@ -221,7 +230,6 @@ find_prev_report(Date, State, Limit) ->
   end.
 
 get_storage_key(Date, State) ->
-  error_logger:info_report({report, State#state.report_module, Date}),
   {report, State#state.report_module, Date}.
 
 make_report_dir([]) -> { error, enoent};
@@ -235,3 +243,5 @@ make_report_dir(Path) ->
       end
   end.
 
+sync_tick(Interval) ->
+  timer:send_after(Interval * 1000, sync).

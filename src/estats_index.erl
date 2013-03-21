@@ -7,7 +7,7 @@
 
 -spec put(Table :: tid(), Key :: any(), Value :: any()) -> ok.
 put(Table, Key, Value) ->
-  ets:insert(Table, {Key, Value}),
+  dets:insert(Table, {Key, Value}),
   ok.
 
 -spec search(Table :: tid(), Key :: term()) -> [ any() ].

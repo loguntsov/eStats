@@ -7,11 +7,9 @@
 
 %% API
 -export([
-  map_save/3, map_load/3, map_list/2, index_add/3, subkey/2, index_get/2,
+  map_save/4, map_load/3, map_load/2, map_load_list/2, map_list/2, map_hash/1, map_hash_list/1, index_add/3, index_add_limit/4, index_size/2, subkey/2, index_get/2,
   counter_inc/3, counter_inc/4, counter_get/2, counters_list_get/2, subkey_list/2, subkey_list/1,
-  index_get_all/3, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1 ]).
-
-
+  index_get_all/3, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1, sync/1]).
 
 -spec open(Path :: string(), Options :: proplist()) -> {ok, report_info}.
 open(Path, Options) ->
@@ -69,6 +67,12 @@ close(Report) ->
   ok = dets:close(Report#report_info.counters),
   ok = dets:close(Report#report_info.map),
   ok = dets:close(Report#report_info.index),
+  ok.
+
+sync(Report) ->
+  ok = dets:sync(Report#report_info.counters),
+  ok = dets:sync(Report#report_info.map),
+  ok = dets:sync(Report#report_info.index),
   ok.
 
 -spec table_name(Path :: string(), Suffix::atom()) -> string().
@@ -165,25 +169,95 @@ subkey_swap(Key, []) -> Key;
 subkey_swap(Key, Changes) when is_list(Key),is_list(Changes) ->
   [ lists:nth(X, Key) || X <- Changes ].
 
+%% Сохранить значение Data в словаре и получить его хеш. Limit - указывает как много можно сохранить в массиве значений по ключу Key
+-spec map_save(Report :: report_info, Limit :: integer() | infinity, Key :: term(), Data :: term()) -> limit | { ok | exists, Hash :: integer() }.
+map_save(Report, Limit, Key, Data) ->
+  Hash = map_hash(Data),
+  L = if
+        is_integer(Limit) ->
+          { Limit, fun(R, K, D) ->
+            dets:member(R#report_info.map, subkey(K, D))
+          end };
+        true -> infinity
+      end,
+  case index_add_limit(Report, L, Key, Hash) of
+    limit -> limit;
+    ok ->
+      ok = dets:insert(Report#report_info.map, { subkey(Key, Hash) , Data }),
+      { ok, Hash };
+    exists ->
+      { exists, Hash }
+  end.
 
-map_save(Report, Key, Data) ->
-  Hash = d_hash(Data),
-  dets:insert(Report#report_info.map, { { Key, Hash } , Data }),
-  index_add(Report, Key, Hash),
-  Hash.
 
 map_load(Report, Key, Hash) ->
-  case ets:lookup(Report#report_info.map, { Key, Hash}) of
+  map_load(Report, subkey(Key, Hash)).
+
+map_load(Report, Key) ->
+  case dets:lookup(Report#report_info.map, Key ) of
     [ ] -> none;
     [ A ] -> A
   end.
+
+map_load_list(Report, Keys) when is_list(Keys) ->
+  [ map_load(Report, Key) || Key <- Keys ].
+
+map_hash(Term) ->
+  erlang:phash2(Term, 4294967296). % 2^32
+
+-spec map_hash_list(List :: list()) -> list().
+map_hash_list(List) when is_list(List) ->
+  [ map_hash(X) || X <- List ];
+
+map_hash_list(Term) ->
+  map_hash_list([Term]).
 
 map_list(Report, Key) when is_list(Key)->
   dets:lookup(Report#report_info.index, Key).
 
 index_add(Report, Key, Data) ->
-  dets:insert(Report#report_info.index, { Key, Data} ),
+  ok = dets:insert(Report#report_info.index, { Key, Data } ),
   ok.
+
+%% Добавить Data в индекс Key с учетом лимита Limit
+-spec index_add_limit(Report :: report_info, Limit :: integer() | infinity, Key :: term(), Data :: term()) ->
+  exists | %% Значение Data в индексе Key уже есть
+  limit | %% Значение в индекс не добавлено, т.к. превышен лимит для данного ключа
+  ok.   %% В индекс добавлено новое значение
+index_add_limit(Report, infinity, Key, Data) ->
+  index_add(Report, Key, Data);
+
+index_add_limit(Report, { Limit, ExistsFun }, Key, Data) when is_integer(Limit), is_function(ExistsFun,3) ->
+  case ExistsFun(Report, Key, Data) of
+    false ->
+      CountKey = { index_count, Key },
+      Count = case dets:lookup(Report#report_info.map, CountKey) of
+        [ ] -> 0;
+        [ {  _ , A } ] -> A
+      end,
+
+      if
+        Count > Limit -> limit;
+        true ->
+          ok = index_add(Report, Key, Data),
+          if
+            Count =:= 0 ->
+              ok = dets:insert(Report#report_info.map, { CountKey, 1 });
+            true ->
+              dets:update_counter(Report#report_info.map, CountKey, 1)
+          end,
+          ok
+      end;
+    true -> exists
+  end.
+
+-spec index_size(Report :: report_info, Key :: term()) -> integer().
+index_size(Report, Key) ->
+  case dets:lookup(Report#report_info.map, { index_count, Key }) of
+    [ ] ->
+      length(index_get(Report, Key ));
+    [ { _, Count } ] when is_integer(Count) -> Count
+  end.
 
 
 index_lookup(Report, Key) ->
@@ -213,9 +287,9 @@ group([Label | Labels], Data ) ->
       { [Key0], Value} -> group(Labels, [{Key0,Value}]);
       _ -> X
     end || X <- group(Labels, ValueList)
-    ] } ] || {Key, ValueList} <- group_pairs(lists:keysort(1,
+    ] } ] || {Key, ValueList} <- group_pairs(
     [ { Key, { Keys, Value } } || {[ Key | Keys ], Value} <- Data ]
-  ))
+  )
   ].
 
 %% Взято отсюда: https://github.com/arcusfelis/lists2/blob/master/src/lists2.erl#L286
@@ -247,7 +321,4 @@ group_reduce([{NewKey, Val}|T], OldKey, Vals) ->
 group_reduce([], Key, Vals) ->
   [{Key, lists:reverse(Vals)}].
 
--spec d_hash(Data :: any() ) -> integer().
-d_hash(Data) ->
-  erlang:phash(Data, 4294967295). % 2^32 - 1
 

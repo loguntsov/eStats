@@ -43,7 +43,6 @@ from_json(Json) ->
             user_agent = proplists:get_value(<<"useragent">>, Proplist, undefined),
             subid = dict:from_list([ { Index, Item } || { Index, Item} <- Subid, Item =/= ''])
         },
-        error_logger:info_report({Json, Click}),
         { ok, Click }
     end
   catch

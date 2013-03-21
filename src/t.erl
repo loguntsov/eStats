@@ -30,7 +30,7 @@ clicks(Pid, N) ->
   clicks(Pid, N-1).
 
 random_click() ->
-  Date = { 2013, random:uniform(2), random:uniform(28) },
+  Date = { 2013, 2, 10 }, % { 2013, random:uniform(2), random:uniform(28) },
   #click_info {
     id = random:uniform(10000),
     offer_id = random:uniform(2),
@@ -39,11 +39,11 @@ random_click() ->
     affiliate_id = random:uniform(2),
     advertiser_id = random:uniform(2),
     subid = dict:from_list([
-      { 1, random_prop({<<"1">>, <<"2">>}) },
+      { 1, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>}) },
       { 2, random_prop({<<"1">>, <<"2">>}) },
       { 3, random_prop({<<"1">>, <<"2">>}) },
       { 4, random_prop({<<"1">>, <<"2">>}) },
-      { 5, random_prop({<<"1">>, <<"2">>}) }
+      { 5, random:uniform(10000) }
     ]),  % Список subid
     http_referer = <<"http://referer.com/hello/world?hi=123">>,
     domain = <<"referer.com">>,

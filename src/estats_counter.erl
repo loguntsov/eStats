@@ -9,21 +9,20 @@
 -spec inc(Table :: tid(), Key :: tuple()) -> ok.
 inc(Table, Key) -> inc(Table, Key, 1).
 
--spec inc(Table :: tid(), Key :: tuple(), Step :: term() ) -> ok | { error, Reason :: term() }.
+-spec inc(Table :: tid(), Key :: tuple(), Step :: term() ) -> ok | { ok, Value :: integer() } | { error, Reason :: term() }.
 inc(Table, Key, Step) when is_integer(Step) ->
   try dets:update_counter(Table, Key, Step) of
-    _ -> ok
+    Count -> {ok, Count}
   catch
     error:badarg -> dets:insert(Table, { Key, Step }),
-        ok
-  end,
-  ok;
+      { ok, Step }
+  end;
 
 inc(_Table, _Key, {_Pos, 0 } ) -> ok;
 
 inc(Table, Key, {Pos, Step} ) ->
   try dets:update_counter(Table, Key, {Pos + 1, Step}) of
-    _ -> ok
+    Count -> { ok, Count }
   catch
     error:badarg ->
       Values = case dets:member(Table, Key) of
@@ -32,11 +31,11 @@ inc(Table, Key, {Pos, Step} ) ->
         true ->
           [ Val ] = dets:lookup(Table, Key),
           List = tuple_to_list(Val),
-          [ Key ] ++ List ++ [ 0 || _ <- lists:seq(2,max(1,Pos-size(Val)-1)) ] ++ [ Step ]
+          List ++ lists:duplicate(max(0,Pos-(size(Val))),0) ++ [ Step ]
       end,
-      dets:insert(Table, list_to_tuple(Values))
+      ok = dets:insert(Table, list_to_tuple(Values)),
+      { ok, Step }
   end;
-
 
 inc(Table, Key, Steps) when is_list(Steps) ->
   { List, _ } = lists:mapfoldl(fun(Step, Index) ->
@@ -44,7 +43,7 @@ inc(Table, Key, Steps) when is_list(Steps) ->
   end, 1, Steps),
   Pairs = lists:reverse(List),
   lists:map(fun(Pair) ->
-    ok = inc(Table, Key, Pair)
+    inc(Table, Key, Pair)
   end, Pairs),
   ok.
 
@@ -57,4 +56,5 @@ get_value(Table, Key) ->
       [ _ | Values ] = tuple_to_list(Tuple),
       Values
   end.
+
 

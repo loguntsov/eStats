@@ -77,7 +77,7 @@ echo(Json, Req) ->
 
     Query = get_property('query', Proplist),
 
-    QueryTuple = list_to_tuple(lists:reverse(lists:map(fun(Name) ->
+    QueryTuple = list_to_tuple(lists:map(fun(Name) ->
       Param = erlang:atom_to_binary(Name, utf8),
       try
         { Param, Value } = proplists:lookup(Param, Query),
@@ -85,21 +85,22 @@ echo(Json, Req) ->
       catch
         error:{badmatch,none} -> throw({error, query_property_not_found, Param})
       end
-    end, Input))),
-
-    Data = [ case Item of
-        { Key, Value } -> {format_key(Key, Output), Value };
-        X -> X
-      end || Item <- lists:usort(
-        case estats_offer_server:report(estats_offer_server:pid(), Module, Type, Period, QueryTuple ) of
-          {error, Reason} -> throw({error, report_answer, Reason});
-          {ok, D} -> D
-        end
-      )
-    ],
-
-
-    BeforeJson = estats_report:group([ erlang:atom_to_binary(Item, utf8) || Item <- Output], Data),
+    end, Input)),
+    ReportData = case estats_offer_server:report(estats_offer_server:pid(), Module, Type, Period, QueryTuple ) of
+      {error, Reason} -> throw({error, report_answer, Reason});
+      {ok, D} -> D
+    end,
+    BeforeJson = if
+      is_list(Output) ->
+        Data = [ case Item of
+          { Key, Value } -> {format_key(Key, Output), Value };
+          X -> X
+        end || Item <- lists:usort(ReportData)
+        ],
+        estats_report:group([ erlang:atom_to_binary(Item, utf8) || Item <- Output], Data);
+      is_function(Output,2) ->
+        Output(QueryTuple, ReportData)
+      end,
 
     Answer = try
       jsx:encode(BeforeJson)
@@ -174,4 +175,6 @@ format_key(_, []) -> [];
 format_key([Key | Keys ], [ Label | Labels ] ) when Label =:= 'date' ->
   [ date:to_sql_binary(Key) | format_key(Keys, Labels) ];
 format_key([Key | Keys ], [ _Label | Labels ] ) ->
-  [ Key | format_key(Keys, Labels) ].
+  [ Key | format_key(Keys, Labels) ];
+format_key(Key, [Label]) ->
+  format_key([Key],[Label]).
