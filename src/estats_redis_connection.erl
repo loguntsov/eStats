@@ -4,15 +4,15 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2]).
+-export([start_link/1]).
 
 %% gen_server
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
   code_change/3]).
 
 %% API
-start_link(Redis, Offer_server) ->
-  gen_server:start_link(?MODULE, {Redis, Offer_server}, []).
+start_link(Connection) ->
+  gen_server:start_link(?MODULE, Connection, []).
 
 %% gen_server callbacks
 -record(state, {

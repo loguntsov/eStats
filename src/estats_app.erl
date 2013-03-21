@@ -49,7 +49,7 @@ init(Options) ->
     case Redis of
       undefined -> [];
       _ ->
-        Connections = [ Redis || _ <- lists:seq(1, proplists:get_value(connections, Redis, 1)) ],
+        Connections = lists:duplicate(proplists:get_value(connections, Redis, 1), Redis),
         [{ estats_redis_sup, { estats_redis_sup, start_link, [ Connections ] }, permanent, 5000, supervisor, []}]
     end
   ]),
