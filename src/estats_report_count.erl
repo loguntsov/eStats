@@ -52,7 +52,7 @@ handle_report({affiliates_by_offer, Period, { Offer } }, Report) when is_list(Pe
 
 handle_report({offers_by_affiliate, Period, { Affiliate } }, Report) when is_list(Period) ->
   {ok, lists:usort(
-    [ Affiliate || [ _, _, _, Affiliate ] <- estats_report:index_get_all(Report, [ c, Period, Affiliate ], [])]
+    [ Offer || [ _, _, _, Offer ] <- estats_report:index_get_all(Report, [ c, Period, Affiliate ], [])]
   )};
 
 handle_report({affiliates_hour_count, Period, { Offer, Affiliate } }, Report) when is_list(Period) ->
