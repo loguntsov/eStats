@@ -36,7 +36,8 @@ init(Options) ->
 
   Dispatch = cowboy_router:compile([
     {'_', [
-      {"/", estats_cowboy_http_handler, []}
+      {"/", estats_cowboy_http_handler, []},
+      {"/help", estats_cowboy_help_hangler, []}
     ]}
   ]),
   {ok, _} = cowboy:start_http(http, 10, [{port, HttpPort}], [
