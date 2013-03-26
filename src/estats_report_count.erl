@@ -8,14 +8,11 @@
 -export([handle_click/2, handle_report/2, handle_info/1]).
 
 handle_click(Click, Report) ->
-  Is_uniq_step = case Click#click_info.is_unique of
-    true -> 1;
-    false -> 0
-  end,
+  Step = [ 1, estats_click:uniq_step(Click) ],
   Hour = Click#click_info.hour,
-  estats_report:counter_inc(Report, [ offer_by_affiliate, Click#click_info.date, Click#click_info.affiliate_id ] , [ Click#click_info.offer_id, Hour ], [ 1, Is_uniq_step ] ),
-  estats_report:counter_inc(Report, [ offer_by_affiliate, Click#click_info.date, 0 ] , [ Click#click_info.offer_id , Hour ], [ 1, Is_uniq_step ]),
-  estats_report:index_add(Report, [ affiliate_by_offer, Click#click_info.date, Click#click_info.offer_id ] , [ Click#click_info.affiliate_id ]), %% Индекс: аффилы которые льют на оффер
+  estats_report:counter_inc(Report, [ a, Click#click_info.date, Click#click_info.affiliate_id ] , [ Click#click_info.offer_id, Hour ], Step ),
+  estats_report:counter_inc(Report, [ a, Click#click_info.date, 0 ] , [ Click#click_info.offer_id , Hour ], Step),
+  estats_report:index_add(Report, [ b, Click#click_info.date, Click#click_info.offer_id ] , [ Click#click_info.affiliate_id ]), %% Индекс: аффилы которые льют на оффер
   estats_report:index_add(Report, [ c, Click#click_info.date, Click#click_info.affiliate_id ] , [ Click#click_info.offer_id ]), %% Индекс: офферы на которые льет аффил
   ok.
 
@@ -46,7 +43,7 @@ handle_info(affiliates_day_count) ->
 
 handle_report({affiliates_by_offer, Period, { Offer } }, Report) when is_list(Period) ->
   {ok, [ X || X <- lists:usort(
-      [ Affiliate || [ _, _, _, Affiliate ] <- estats_report:index_get_all(Report, [ affiliate_by_offer, Period, Offer ], [])]
+      [ Affiliate || [ _, _, _, Affiliate ] <- estats_report:index_get_all(Report, [ b, Period, Offer ], [])]
     ), X > 0]
   };
 
@@ -59,7 +56,7 @@ handle_report({affiliates_hour_count, Period, { Offer, Affiliate } }, Report) wh
   {ok, [ { estats_report:subkey_swap(Key, [4, 2, 5, 3]), Value } || {Key, Value} <-
         estats_report:counters_list_get(Report,
           estats_report:subkey_list(
-            [ offer_by_affiliate, Period, Offer, Affiliate, lists:seq(0,23) ])
+            [ a, Period, Affiliate, Offer, lists:seq(0,23) ])
         )
     ]
   };
@@ -68,7 +65,7 @@ handle_report({affiliates_day_count, Period, { Offer, Affiliate } }, Report) whe
   {ok, [ { estats_report:subkey_swap(Key, [4, 2, 3 ]), Value } || {Key, Value} <-
       estats_report:counters_list_get(Report,
         estats_report:subkey_list(
-          [ offer_by_affiliate, Period, Offer, Affiliate ])
+          [ a, Period, Affiliate, Offer ])
       )
     ]
   }.

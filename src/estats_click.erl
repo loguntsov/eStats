@@ -4,7 +4,7 @@
 -include("include/click_info.hrl").
 
 %% API
--export([from_json/1]).
+-export([from_json/1, uniq_step/1]).
 
 -spec from_json(Json :: binary()) -> {ok, click_info} | { error, Reason :: term() }.
 from_json(Json) ->
@@ -65,3 +65,8 @@ from_binary(Term) ->
       end
   end.
 
+uniq_step(Click) ->
+  case Click#click_info.is_unique of
+    true -> 1;
+    false -> 0
+  end.

@@ -5,21 +5,18 @@
 
 -behaviour(estats_gen_report).
 
--export([handle_click/2, handle_report/2, handle_info/1, step_sum/2]).
+-export([handle_click/2, handle_report/2, handle_info/1]).
 
 -define(SUBID_LIMIT_COUNT, 1000).
 
 handle_click(Click, Report) ->
-  Is_uniq_step = case Click#click_info.is_unique of
-    true -> 1;
-    false -> 0
-  end,
+  Step = [ 1, estats_click:uniq_step(Click) ],
   dict:map(fun(Index, Subid) ->
     case estats_report:map_save(Report, ?SUBID_LIMIT_COUNT, [ Click#click_info.date, Click#click_info.affiliate_id, Click#click_info.offer_id, Index ], Subid ) of
       limit ->
         ok;
       { Type, Hash } when Type =:= ok; Type =:= exists ->
-        estats_report:counter_inc(Report, [ Click#click_info.date, Click#click_info.affiliate_id, Click#click_info.offer_id, Index ] , [ Hash ], [ 1, Is_uniq_step ])
+        estats_report:counter_inc(Report, [ Click#click_info.date, Click#click_info.affiliate_id, Click#click_info.offer_id, Index ] , [ Hash ], Step )
     end,
     ok
   end, Click#click_info.subid),
@@ -38,7 +35,7 @@ handle_info(top) ->
       Dict = lists:foldl(fun({[ _, _, _, _, Hash ], Value}, Dict) ->
         El = case dict:find(Hash, Dict) of
           { ok, Dict_value} -> estats_report_subid:step_sum(Dict_value, Value);
-          error -> estats_report_subid:step_sum(Value, [])
+          error -> estats_counter:step_sum(Value, [])
         end,
         dict:store(Hash, El, Dict)
       end, dict:new(), List),
@@ -65,15 +62,3 @@ handle_report({top, Period, { _Order_pos, Affiliate, Offer, Index } }, Report ) 
   Counters = estats_report:index_get_all(Report, [ Period, Affiliate, Offer, Index ], []),
   { ok, estats_report:counters_list_get(Report, Counters) }.
 
-
-step_sum([],[]) -> [];
-step_sum([], [B | BList]) ->
-  [ B | step_sum([], BList) ];
-step_sum([A | AList],[]) ->
-  [ A | step_sum(AList, []) ];
-step_sum([A | AList ] , [ B | BList ]) ->
-  [ A + B | step_sum(AList, BList) ];
-step_sum(A, List) when not(is_list(A)), is_list(List) ->
-  step_sum([A, 0], List);
-step_sum(List, B) when not(is_list(B)), is_list(List) ->
-  step_sum(List, [B,0]).

@@ -6,7 +6,9 @@
 
 %% API
 -export([year/1, month/1, day/1, is_valid/1, gregorian_days/1, period_to_list/1, next_days/2, between/2, to_string/1, to_string/2,
-  to_proplists/1, from_proplists/1, proplists_is_date/1, to_binary/1, to_binary/2,from_sql_binary/1, to_sql_binary/1
+  to_proplists/1, from_proplists/1, proplists_is_date/1, to_binary/1, to_binary/2,from_sql_binary/1, to_sql_binary/1,
+  to_week_number/1, from_week_number/1, start_week/1,
+  start_month/1
 ]).
 
 -spec year(Date :: date()) -> integer().
@@ -113,3 +115,25 @@ from_sql_binary(Binary) when is_binary(Binary) ->
 
 to_sql_binary({Year, Month, Day}) ->
   << (erlang:integer_to_binary(Year))/binary, <<"-">>/binary, (list_to_binary(io_lib:format("~2..0B-~2..0B", [Month, Day])))/binary >>.
+
+to_week_number(Dates) when is_list(Dates) ->
+  [ to_week_number(Date) || Date <- Dates ];
+
+to_week_number(Date) ->
+  (calendar:date_to_gregorian_days(Date) - 2) div 7.
+
+from_week_number(Weeks) when is_list(Weeks) ->
+  [from_week_number(Week) || Week <- Weeks];
+
+from_week_number(Week) ->
+  calendar:gregorian_days_to_date(Week * 7 + 2).
+
+start_week(Dates) when is_list(Dates) ->
+  [ start_week(Date) || Date <- Dates ];
+
+start_week(Date) ->
+  from_week_number(to_week_number(Date)).
+
+start_month({Year, Month, _ }) ->
+  {Year, Month, 1}.
+

@@ -1,5 +1,5 @@
 %% Copyright
--module(estats_cowboy_help_hangler).
+-module(estats_cowboy_help_handler).
 
 %% API
 -export([init/3, handle/2, terminate/3]).

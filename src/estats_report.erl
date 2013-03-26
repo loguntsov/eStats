@@ -9,7 +9,9 @@
 -export([
   map_save/4, map_load/3, map_load/2, map_load_list/2, map_list/2, map_hash/1, map_hash_list/1, index_add/3, index_add_limit/4, index_size/2, subkey/2, index_get/2,
   counter_inc/3, counter_inc/4, counter_get/2, counters_list_get/2, subkey_list/2, subkey_list/1,
-  index_get_all/3, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1, sync/1]).
+  index_get_all/3, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1, sync/1,
+  key_transform/2, format_key/2, format_tuple/2
+]).
 
 -spec open(Path :: string(), Options :: proplist()) -> {ok, report_info}.
 open(Path, Options) ->
@@ -169,6 +171,13 @@ subkey_swap(Key, []) -> Key;
 subkey_swap(Key, Changes) when is_list(Key),is_list(Changes) ->
   [ lists:nth(X, Key) || X <- Changes ].
 
+% Трансформировать ключи с помощью функции
+-spec key_transform(Func :: function(), List :: list()) -> list().
+key_transform(Func, List) when is_list(List), is_function(Func) ->
+  lists:map(fun({Key, Value}) ->
+    { Func(Key), Value }
+  end, List).
+
 %% Сохранить значение Data в словаре и получить его хеш. Limit - указывает как много можно сохранить в массиве значений по ключу Key
 -spec map_save(Report :: report_info, Limit :: integer() | infinity, Key :: term(), Data :: term()) -> limit | { ok | exists, Hash :: integer() }.
 map_save(Report, Limit, Key, Data) ->
@@ -321,4 +330,18 @@ group_reduce([{NewKey, Val}|T], OldKey, Vals) ->
 group_reduce([], Key, Vals) ->
   [{Key, lists:reverse(Vals)}].
 
+% Форматировать элемент ключа в соотвествии с его типом
+-spec format_key( Key :: list(), Labels :: list()) -> list().
+format_key([], _) -> [];
+format_key(Key, []) -> Key;
+format_key([Key | Keys ], [ Label | Labels ] ) when Label =:= 'date' ->
+  [ date:to_sql_binary(Key) | format_key(Keys, Labels) ];
+format_key([Key | Keys ], [ _Label | Labels ] ) ->
+  [ Key | format_key(Keys, Labels) ];
+format_key(Key, [Label]) ->
+  format_key([Key],[Label]).
 
+format_tuple(TupleList, Labels) ->
+  lists:map(fun({Key, Value}) ->
+    { format_key(Key, Labels) , Value }
+  end, TupleList).

@@ -50,9 +50,11 @@ echo(Json, Req) ->
     catch
       error:badarg -> throw({error, type_not_recognized})
     end,
-    {Input, Output} = try
-      {ok, In, Out} = Module:handle_info(Type),
-      {In, Out}
+    {InputCols, InputFunc, Output} = try
+      case Module:handle_info(Type) of
+        {ok, In, Out} -> { In, fun(QueryTuple) -> QueryTuple end, Out };
+        {ok, In, InFunc, Out } -> { In, InFunc, Out }
+      end
     catch
       error:function_clause ->
         throw({error, type_not_recognized})
@@ -85,21 +87,22 @@ echo(Json, Req) ->
       catch
         error:{badmatch,none} -> throw({error, query_property_not_found, Param})
       end
-    end, Input)),
-    ReportData = case estats_offer_server:report(estats_offer_server:pid(), Module, Type, Period, QueryTuple ) of
+    end, InputCols)),
+    { NewPeriod, NewQuery } = InputFunc({Period, QueryTuple}),
+    ReportData = case estats_offer_server:report(estats_offer_server:pid(), Module, Type, NewPeriod, NewQuery ) of
       {error, Reason} -> throw({error, report_answer, Reason});
       {ok, D} -> D
     end,
     BeforeJson = if
       is_list(Output) ->
         Data = [ case Item of
-          { Key, Value } -> {format_key(Key, Output), Value };
+          { Key, Value } -> {estats_report:format_key(Key, Output), Value };
           X -> X
         end || Item <- lists:usort(ReportData)
         ],
         estats_report:group([ erlang:atom_to_binary(Item, utf8) || Item <- Output], Data);
       is_function(Output,2) ->
-        Output(QueryTuple, ReportData)
+        Output(NewQuery, ReportData)
       end,
 
     Answer = try
@@ -170,11 +173,4 @@ module_is_report(Module) ->
     _: _ -> false
   end.
 
-format_key([], _) -> [];
-format_key(_, []) -> [];
-format_key([Key | Keys ], [ Label | Labels ] ) when Label =:= 'date' ->
-  [ date:to_sql_binary(Key) | format_key(Keys, Labels) ];
-format_key([Key | Keys ], [ _Label | Labels ] ) ->
-  [ Key | format_key(Keys, Labels) ];
-format_key(Key, [Label]) ->
-  format_key([Key],[Label]).
+

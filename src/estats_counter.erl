@@ -4,7 +4,7 @@
 -type(tid() :: integer()).
 
 %% API
--export([inc/2, inc/3, get_value/2]).
+-export([inc/2, inc/3, get_value/2, step_sum/2, step_sum/3]).
 
 -spec inc(Table :: tid(), Key :: tuple()) -> ok.
 inc(Table, Key) -> inc(Table, Key, 1).
@@ -57,4 +57,20 @@ get_value(Table, Key) ->
       Values
   end.
 
+step_sum(List1, List2, Number) ->
+  step_sum(step_sum(List1, lists:duplicate(Number,0)),step_sum(List2, lists:duplicate(Number,0))).
+
+step_sum([],[]) -> [];
+step_sum([], [B | BList]) ->
+  [ B | step_sum([], BList) ];
+step_sum([A | AList],[]) ->
+  [ A | step_sum(AList, []) ];
+step_sum([A | AList ] , [ B | BList ]) ->
+  [ A + B | step_sum(AList, BList) ];
+step_sum(A, List) when not(is_list(A)), is_list(List) ->
+  step_sum([A, 0], List);
+step_sum(List, B) when not(is_list(B)), is_list(List) ->
+  step_sum(List, [B,0]);
+step_sum(A,B) ->
+  [ A + B, 0 ].
 
