@@ -60,7 +60,7 @@ from_binary(Term) ->
       try
         binary_to_existing_atom(Term, utf8)
       catch
-        error:badarg ->
+        error: _ ->
           Term
       end
   end.
