@@ -9,8 +9,9 @@
 -export([
   map_save/4, map_load/3, map_load/2, map_load_list/2, map_list/2, map_hash/1, map_hash_list/1, index_add/3, index_add_limit/4, index_size/2, subkey/2, index_get/2,
   counter_inc/3, counter_inc/4, counter_get/2, counters_list_get/2, subkey_list/2, subkey_list/1,
-  index_get_all/3, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1, sync/1,
-  key_transform/2, format_key/2, format_tuple/2
+  index_get_all/3, index_get_all/2, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1, sync/1,
+  key_transform/2, format_key/2, format_tuple/2,
+  sort_by_value/2, value_sum/1
 ]).
 
 -spec open(Path :: string(), Options :: proplist()) -> {ok, report_info}.
@@ -276,6 +277,10 @@ index_get(Report, Keys) when is_list(Keys)->
   [ subkey(Key0,Data0) || { Key0 , Data0 } <- lists:flatten([ index_lookup(Report, Key) || Key <- Keys ]) ].
 
 
+index_get_all(Report, Key) ->
+  index_get_all(Report, Key, []).
+
+% deprecated
 index_get_all(Report, Key, Subkey_list ) ->
   index_get(Report,subkey_list(Key, Subkey_list)).
 
@@ -345,3 +350,33 @@ format_tuple(TupleList, Labels) ->
   lists:map(fun({Key, Value}) ->
     { format_key(Key, Labels) , Value }
   end, TupleList).
+
+sort_by_value(Order_pos, List) when is_list(List) ->
+  [ { Key, estats_counter:step_unpop(Order_pos, Value) } || { Key, Value } <-
+      lists:keysort(2, [ {Key, estats_counter:step_pop(Order_pos, Value) } || { Key, Value } <- List ]) ].
+
+% Произвести сложение значений с одинаковыми ключами.
+-spec value_sum(List :: list()) -> list().
+value_sum(List) ->
+  Ets = ets:new(none, [ set ]),
+  try
+    lists:foldl(fun
+      ({Key, Value}, _ ) ->
+        case ets:lookup(Ets, Key) of
+          [ ] ->
+            ets:insert(Ets, { Key, estats_counter:step_expand(estats_click:step_max_length(),Value) });
+          [ { Key, V } ] when is_list(V);is_integer(V) ->
+            ets:insert(Ets, { Key, estats_counter:step_sum(estats_click:step_max_length(), Value, V) });
+          [ { Key, V } ] ->
+            ets:insert(Ets, { Key, V })
+        end,
+        none;
+      ( _, _ ) -> none
+    end, none, List),
+    ets:foldl(fun(Term, Xs) ->
+    [ Term | Xs ]
+    end, [ ], Ets)
+  after
+    ets:delete(Ets),
+    []
+  end.

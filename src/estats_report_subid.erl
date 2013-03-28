@@ -39,13 +39,8 @@ handle_info(top) ->
         end,
         dict:store(Hash, El, Dict)
       end, dict:new(), List),
-      Data = lists:reverse(lists:keysort(
-        Order_pos+1, [ { Key, Click, Uniq } || { Key, [ Click, Uniq ] } <- dict:to_list(Dict) ]
-      )),
-      estats_report:group([<<"hash">>], [
-        { Key, [ Click, Uniq ] } ||
-        { Key, Click, Uniq } <- Data
-      ])
+      Data = lists:reverse(estats_report:sort_by_value(Order_pos, dict:to_list(Dict))),
+      { group_by, [ hash ], Data }
     end
   }.
 

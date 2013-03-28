@@ -98,11 +98,15 @@ echo(Json, Req) ->
         Data = [ case Item of
           { Key, Value } -> {estats_report:format_key(Key, Output), Value };
           X -> X
-        end || Item <- lists:usort(ReportData)
+        end || Item <- lists:usort(estats_report:value_sum(ReportData))
         ],
         estats_report:group([ erlang:atom_to_binary(Item, utf8) || Item <- Output], Data);
       is_function(Output,2) ->
-        Output(NewQuery, ReportData)
+        case Output(NewQuery, ReportData) of
+          { group_by, Colums, Data } ->
+            estats_report:group([ erlang:atom_to_binary(Item, utf8) || Item <- Colums], Data);
+          Value -> Value
+        end
       end,
 
     Answer = try
@@ -128,8 +132,8 @@ echo(Json, Req) ->
       reply_html(Json, <<"Отчет вернул следующую ошибку: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req);
     throw:{error, query_property_not_found, Prop} ->
       reply_html(Json, <<"Для данного отчета не могу найти требуемое поле в запросе: ", Prop/binary >>, Req)
-%    error:R ->
-%      reply_html(Json, <<"В процессе обработки ошибки возникла следующая ошибка: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req)
+    %error:R ->
+      %reply_html(Json, <<"В процессе обработки ошибки возникла следующая ошибка: ", (list_to_binary(lists:flatten(io_lib:format("~p",[R]))))/binary >>, Req)
   end.
 
 terminate(_Reason, _Req, _State) ->

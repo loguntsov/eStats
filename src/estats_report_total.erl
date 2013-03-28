@@ -42,7 +42,7 @@ group_fun(KeyFun) ->
       end,
       dict:store(Key, estats_counter:step_sum(OldValue, Value), Dict)
     end,dict:new(), ReportData)),[ date ]),
-    estats_report:group([<<"date">>], Data)
+    { group_by, [ date ], Data }
   end.
 
 

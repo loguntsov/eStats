@@ -46,7 +46,7 @@ random_click() ->
       { 5, random:uniform(10000) }
     ]),  % Список subid
     http_referer = <<"http://referer.com/hello/world?hi=123">>,
-    domain = <<"referer.com">>,
+    domain = << <<"referer">>/binary, (erlang:integer_to_binary(random:uniform(1000)))/binary, <<".com">>/binary >>,
     user_agent = <<"Unknown">>,
     ip = <<"10.123.123.54">>,
     year = date:year(Date),

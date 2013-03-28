@@ -22,7 +22,8 @@ init({Path}) ->
   { ok , Pid } = estats_report_sup:start_link([
     estats_report_count,
     estats_report_subid,
-    estats_report_total
+    estats_report_total,
+    estats_report_referer
   ], Path, write),
   {ok, #state{
     reports_sup = Pid,

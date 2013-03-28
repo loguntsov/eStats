@@ -22,7 +22,7 @@ start_link() ->
 
 init({}) ->
   gproc:add_local_name(estats_date_manager),
-  {ok, Table} = dets:open_file(dets_date_manager, [{type, set}, {file , "data/storage/set"},{auto_save, 180*1000}, {repair, true}, {ram_file, true}]),
+  {ok, Table} = dets:open_file(dets_date_manager, [{type, set}, {file , "data/storage/set"} ]),
   {ok, #state{
     set = Table
   }}.

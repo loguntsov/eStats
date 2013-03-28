@@ -4,7 +4,7 @@
 -include("include/click_info.hrl").
 
 %% API
--export([from_json/1, uniq_step/1]).
+-export([from_json/1, uniq_step/1, step_max_length/0]).
 
 -spec from_json(Json :: binary()) -> {ok, click_info} | { error, Reason :: term() }.
 from_json(Json) ->
@@ -70,3 +70,6 @@ uniq_step(Click) ->
     true -> 1;
     false -> 0
   end.
+
+% Длина счетчика
+step_max_length() -> 2.

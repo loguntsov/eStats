@@ -4,7 +4,7 @@
 -type(tid() :: integer()).
 
 %% API
--export([inc/2, inc/3, get_value/2, step_sum/2, step_sum/3]).
+-export([inc/2, inc/3, get_value/2, step_sum/2, step_sum/3, step_pop/2, step_unpop/2, step_expand/2]).
 
 -spec inc(Table :: tid(), Key :: tuple()) -> ok.
 inc(Table, Key) -> inc(Table, Key, 1).
@@ -57,20 +57,41 @@ get_value(Table, Key) ->
       Values
   end.
 
-step_sum(List1, List2, Number) ->
-  step_sum(step_sum(List1, lists:duplicate(Number,0)),step_sum(List2, lists:duplicate(Number,0))).
+step_sum(N, List1, List2) ->
+  step_sum(step_expand(N, List1),step_expand(N, List2)).
+
+step_expand(0, List) -> List;
+step_expand(N, A) when not(is_list(A)) ->
+  step_expand(N, [ A ]);
+step_expand(N, List) when length(List) < N ->
+  List ++ lists:duplicate(N - length(List), 0);
+step_expand(_, List) -> List.
 
 step_sum([],[]) -> [];
-step_sum([], [B | BList]) ->
+step_sum([], [B | BList]) when is_integer(B)->
   [ B | step_sum([], BList) ];
-step_sum([A | AList],[]) ->
+step_sum([A | AList],[]) when is_integer(A)->
   [ A | step_sum(AList, []) ];
-step_sum([A | AList ] , [ B | BList ]) ->
+step_sum([A | AList ] , [ B | BList ]) when is_integer(A), is_integer(B)->
   [ A + B | step_sum(AList, BList) ];
-step_sum(A, List) when not(is_list(A)), is_list(List) ->
+step_sum(A, List) when is_integer(A), is_list(List) ->
   step_sum([A, 0], List);
-step_sum(List, B) when not(is_list(B)), is_list(List) ->
+step_sum(List, B) when is_integer(B), is_list(List) ->
   step_sum(List, [B,0]);
-step_sum(A,B) ->
+step_sum(A,B) when is_integer(A), is_integer(B)->
   [ A + B, 0 ].
+
+step_pop(0, List) -> List;
+step_pop(1, List) -> List;
+step_pop(N, List) ->
+  L = step_expand(N, List),
+  { Head , [ _ | Tail ] } = lists:split(N-1, L),
+  [ lists:nth(N, L) | Head ++ Tail ].
+
+step_unpop(0, List) -> List;
+step_unpop(1, List) -> List;
+step_unpop(N, [ Head | Tail ] = List) when N =< length(List) ->
+  { List1, List2 } = lists:split(N-1, Tail),
+  List1 ++ [Head] ++ List2.
+
 
