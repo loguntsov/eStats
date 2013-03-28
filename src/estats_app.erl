@@ -3,11 +3,13 @@
 -behaviour(application).
 
 %% application callbacks
--export([start/0, start/2, stop/1]).
+-export([start/0, stop/0, restart/0, start/2, stop/1, prep_stop/1 ]).
 
 -behaviour(supervisor).
 
 -export([init/1]).
+
+-record(state, { pid :: pid() }).
 
 start() ->
 	ok = application:start(gproc),
@@ -17,17 +19,43 @@ start() ->
 	ok = application:start(estats),
 	ok.
 
+stop() ->
+  application:stop(estats),
+  application:stop(cowboy),
+  application:stop(ranch),
+  application:stop(crypto),
+  application:stop(gproc),
+  ok.
+
 start(_Type, _StartArgs) ->
 	{ok, [Options]} = file:consult("estats.conf"),
 	{ok, Pid} = supervisor:start_link(?MODULE, Options),
-	io:format("eStats started\n"),
-	{ok, Pid}.
+	io:format("eStats started~n"),
+	{ok, Pid, #state{ pid = Pid } }.
 
 %%----------------------------------------------------------------------
 %% Func: stop/1
 %% Returns: any
 %%----------------------------------------------------------------------
-stop(_State) -> ok.
+prep_stop(State) ->
+  ok = supervisor:terminate_child(State#state.pid, estats_redis_sup),
+  io:format("eStats wait 10 seconds ...~n"),
+  timer:sleep(10000),
+  State.
+
+stop(_State) ->
+  io:format("eStats stoped~n"),
+  ok.
+
+restart() ->
+  lists:foldl(fun({App, _ , _}, _) ->
+    case App of
+      estats ->
+        stop();
+      _ -> ok
+    end
+  end,0,application:which_applications()),
+  start().
 
 init(Options) ->
   Redis = proplists:get_value( redis, Options ),
