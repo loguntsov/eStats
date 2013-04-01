@@ -41,6 +41,9 @@ prep_stop(State) ->
   ok = supervisor:terminate_child(State#state.pid, estats_redis_sup),
   io:format("eStats wait 10 seconds ...~n"),
   timer:sleep(10000),
+  io:format("eStats save cached info for 10 seconds ...~n"),
+  estats_offer_server:sync(estats_offer_server:pid()),
+  timer:sleep(10000),
   State.
 
 stop(_State) ->
@@ -73,6 +76,7 @@ init(Options) ->
   ]),
 
   Childs = lists:merge([ [
+    { estats_rsaver, { estats_rsaver, start_link, [ ] }, permanent, 60000, worker, [] },
     { estats_storage, { estats_storage, start_link, [ ] }, permanent, 5000 , worker, [] },
     { estats_offer_server, { estats_offer_server, start_link, [ Path ] }, permanent, 5000 , worker, [] } ],
     case Redis of

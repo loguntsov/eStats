@@ -3,8 +3,11 @@
 
 -record(report_info, {
   path :: string(),
-  counters :: tid(), % ETS со счетчиками
-  map :: tid(), % ETS соотвествий хеш -> значение
-  index :: tid() % ETS индекса ключ -> список ключей из map
+  counters = none :: tid(),
+  map = none :: tid(),
+  index = none :: tid(),
+  counters_data :: term(), % DETS со счетчиками
+  map_data :: term(), % DETS соотвествий хеш -> значение
+  index_data :: term() % DETS индекса ключ -> список ключей из map
 }).
 

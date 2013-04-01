@@ -1,7 +1,7 @@
 %% Copyright
 -module(estats_offer_server).
 
--export([click/2, start_link/1, state/1, report/5, pid/0]).
+-export([click/2, start_link/1, state/1, report/5, pid/0, sync/1]).
 
 -include("include/click_info.hrl").
 -include("include/offer_info.hrl").
@@ -43,6 +43,9 @@ click(Pid, Click) ->
 state(Pid) ->
   gen_server:call(Pid, state).
 
+sync(Pid) ->
+  gen_server:cast(Pid, sync).
+
 -spec report(Pid :: pid(), Report_module :: atom(), Type :: atom(), Period :: date_period(), Query :: term()) -> {ok, Result :: term()} | {error, Reason :: term()}.
 report(Pid, Report_module, Type, Period, Query) ->
   Ref = make_ref(),
@@ -80,7 +83,13 @@ handle_cast({report, From, Ref, {Report_module, Query } }, State) ->
     { error, undefined } ->
         report_error(From, Ref, report_module_not_found)
   end,
-  {noreply, State}.
+  {noreply, State};
+
+handle_cast(sync, State) ->
+  lists:foldl(fun(Pid, _) ->
+    estats_gen_report:sync(Pid), ok
+  end, ok, estats_report_sup:pids(State#state.reports_sup)),
+  { noreply, State }.
 
 send_report_query(From, Ref, ReportPid, {Type, Period, Query}) ->
   try

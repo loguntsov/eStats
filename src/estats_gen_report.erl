@@ -6,7 +6,7 @@
 
 %% API
 
--export([start_link/3, click/2, report/2]).
+-export([start_link/3, click/2, report/2, sync/1]).
 
 -behaviour(gen_server).
 
@@ -58,17 +58,30 @@ start_link(Module,Path,Mode) ->
 
 -spec click(Pid :: pid(), Click :: click_info) -> ok.
 click(Pid, Click) ->
-  gen_server:cast(Pid, {click, Click}).
+  { message_queue_len, Msgs } = process_info(Pid, message_queue_len ),
+  if
+    Msgs > 10 ->
+      timer:sleep(1),
+      click(Pid, Click);
+    true ->
+      gen_server:cast(Pid, {click, Click}),
+      ok
+  end.
 
 -spec report(Pid :: pid(), Query :: any()) -> Reply :: any().
 report(Pid, Query) ->
   gen_server:call(Pid, { report, Query}).
 
+sync(Pid) ->
+  Pid ! sync.
+
 handle_cast({click, Click}, State) when State#state.mode =/= readonly ->
   { NewState, Report } = get_report(Click#click_info.date, State),
   estats_report:index_add(Report, dates_info, Click#click_info.date ),
   ok = (State#state.report_module):handle_click(Click, Report),
-  {noreply, NewState}.
+  {noreply, NewState};
+
+handle_cast(_, State) -> { noreply, State }.
 
 handle_call({report, {Type, Period, Query } }, _From, State_main) ->
 %  {ok, _Input, Output} =(State_main#state.report_module):handle_info(Type),
@@ -121,11 +134,11 @@ handle_call( state, _From, State) ->
   {reply, State , State}.
 
 handle_info(sync, State) ->
-  dict:map(fun(_, Report) ->
+  Reports = dict:map(fun(_, Report) ->
     estats_report:sync(Report)
   end, State#state.reports),
   sync_tick(State#state.save_interval),
-  { noreply, State };
+  { noreply, State#state { reports = Reports } };
 
 handle_info(_, State) -> { noreply, State }.
 

@@ -15,7 +15,7 @@
 start(Fun) ->
   start(Fun, 5000).
 
--spec start(Fun :: [ { Key :: term(), Fun :: fun((term()) -> term()) , Data :: tuple() } ], Timeout :: integer()) ->
+-spec start(Fun :: [ { Key :: term(), Fun :: fun((term()) -> term()) , Data :: term() } ], Timeout :: integer()) ->
     {ok, [ { Key :: term(), Answer :: term() } ] } | % Полное завершение получены все ответы
     { error, timeout, Answers :: [ Answer :: term() ] } | % Получены ответы частично
     { error, timeout }. % Ответы не получены вообще

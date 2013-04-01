@@ -9,7 +9,9 @@
 
 t() ->
   erlang:spawn(fun() ->
-    clicks(estats_offer_server:pid(), 100000)
+    error_logger:info_report({tc, timer:tc(fun() ->
+      clicks(estats_offer_server:pid(), 1000000)
+    end)})
   end).
 
 t0(Date, Query) ->
@@ -26,7 +28,12 @@ clicks(_Pid, 0) -> ok;
 
 clicks(Pid, N) ->
   estats_offer_server:click(Pid, random_click()),
-  timer:sleep(5),
+  %timer:sleep(1),
+  if
+    N rem 5000 == 0 ->
+      io:format("~p clicks ~n",[N]);
+    true -> ok
+  end,
   clicks(Pid, N-1).
 
 random_click() ->
@@ -46,7 +53,7 @@ random_click() ->
       { 5, random:uniform(10000) }
     ]),  % Список subid
     http_referer = <<"http://referer.com/hello/world?hi=123">>,
-    domain = << <<"referer">>/binary, (erlang:integer_to_binary(random:uniform(1000)))/binary, <<".com">>/binary >>,
+    domain = << <<"referer">>/binary, (erlang:integer_to_binary(random:uniform(10000)))/binary, <<".com">>/binary >>,
     user_agent = <<"Unknown">>,
     ip = <<"10.123.123.54">>,
     year = date:year(Date),

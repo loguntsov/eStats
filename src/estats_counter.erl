@@ -4,36 +4,36 @@
 -type(tid() :: integer()).
 
 %% API
--export([inc/2, inc/3, get_value/2, step_sum/2, step_sum/3, step_pop/2, step_unpop/2, step_expand/2]).
+-export([inc/2, inc/3, get_value/3, step_sum/2, step_sum/3, step_pop/2, step_unpop/2, step_expand/2, tuple_to_value_list/1]).
 
 -spec inc(Table :: tid(), Key :: tuple()) -> ok.
 inc(Table, Key) -> inc(Table, Key, 1).
 
 -spec inc(Table :: tid(), Key :: tuple(), Step :: term() ) -> ok | { ok, Value :: integer() } | { error, Reason :: term() }.
 inc(Table, Key, Step) when is_integer(Step) ->
-  try dets:update_counter(Table, Key, Step) of
+  try ets:update_counter(Table, Key, Step) of
     Count -> {ok, Count}
   catch
-    error:badarg -> dets:insert(Table, { Key, Step }),
+    error:badarg -> ets:insert(Table, { Key, Step }),
       { ok, Step }
   end;
 
 inc(_Table, _Key, {_Pos, 0 } ) -> ok;
 
 inc(Table, Key, {Pos, Step} ) ->
-  try dets:update_counter(Table, Key, {Pos + 1, Step}) of
+  try ets:update_counter(Table, Key, {Pos + 1, Step}) of
     Count -> { ok, Count }
   catch
     error:badarg ->
-      Values = case dets:member(Table, Key) of
+      Values = case ets:member(Table, Key) of
         false ->
-          [ Key ] ++  [ 0 || _ <- lists:seq(2,Pos) ] ++ [ Step ];
+          [ Key ] ++  lists:duplicate(Pos-1, 0) ++ [ Step ];
         true ->
-          [ Val ] = dets:lookup(Table, Key),
+          [ Val ] = ets:lookup(Table, Key),
           List = tuple_to_list(Val),
           List ++ lists:duplicate(max(0,Pos-(size(Val))),0) ++ [ Step ]
       end,
-      ok = dets:insert(Table, list_to_tuple(Values)),
+      ets:insert(Table, list_to_tuple(Values)),
       { ok, Step }
   end;
 
@@ -47,15 +47,23 @@ inc(Table, Key, Steps) when is_list(Steps) ->
   end, Pairs),
   ok.
 
-
-get_value(Table, Key) ->
-  case dets:lookup(Table, Key) of
+-spec get_value(Type :: ets | dets, Table :: term(), Key :: term()) -> integer() | list().
+get_value(Type, Table, Key) ->
+  case lookup(Type, Table, Key) of
     [ ] -> 0;
     [ { Key, Value } ] -> Value;
     [ Tuple ] when is_tuple(Tuple) ->
-      [ _ | Values ] = tuple_to_list(Tuple),
-      Values
+      tuple_to_value_list(Tuple)
   end.
+
+lookup(ets, Table, Key) ->
+  ets:lookup(Table, Key);
+lookup(dets, Table, Key) ->
+  dets:lookup(Table, Key).
+
+tuple_to_value_list(Tuple) ->
+  [ _ | Values ] = tuple_to_list(Tuple),
+  Values.
 
 step_sum(N, List1, List2) ->
   step_sum(step_expand(N, List1),step_expand(N, List2)).

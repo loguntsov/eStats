@@ -7,7 +7,7 @@
 
 %% API
 -export([
-  map_save/4, map_load/3, map_load/2, map_load_list/2, map_list/2, map_hash/1, map_hash_list/1, index_add/3, index_add_limit/4, index_size/2, subkey/2, index_get/2,
+  map_save/4, map_load/3, map_load/2, map_load_list/2, map_hash/1, map_hash_list/1, index_add/3, index_add_limit/4, subkey/2, index_get/2,
   counter_inc/3, counter_inc/4, counter_get/2, counters_list_get/2, subkey_list/2, subkey_list/1,
   index_get_all/3, index_get_all/2, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1, sync/1,
   key_transform/2, format_key/2, format_tuple/2,
@@ -58,25 +58,29 @@ open(Path, Options) ->
     { keypos , 1 },
     { repair, true }
   ]),
-  {ok, #report_info {
+  {ok, create_ets(#report_info {
         path = Path,
-        counters = Counter_dets,
-        map = Map_dets,
-        index = Index_dets
-  }}.
+        counters_data = Counter_dets,
+        map_data = Map_dets,
+        index_data = Index_dets
+  })}.
+
+create_ets(Report) -> Report,
+  { ok, NewReport } = estats_rsaver:flush(Report),
+  NewReport#report_info{
+    counters = ets:new(none, [ set ]),
+    map = ets:new(none, [ set ]),
+    index = ets:new(none, [ bag ])
+  }.
 
 -spec close(Report :: report_info) -> ok.
 close(Report) ->
-  ok = dets:close(Report#report_info.counters),
-  ok = dets:close(Report#report_info.map),
-  ok = dets:close(Report#report_info.index),
-  ok.
+  ok = estats_rsaver:close(Report).
 
+-spec sync(Report :: report_info) -> report_info.
 sync(Report) ->
-  ok = dets:sync(Report#report_info.counters),
-  ok = dets:sync(Report#report_info.map),
-  ok = dets:sync(Report#report_info.index),
-  ok.
+  { ok, NewReport } = estats_rsaver:flush(Report),
+  create_ets(NewReport).
 
 -spec table_name(Path :: string(), Suffix::atom()) -> string().
 table_name(Path, Suffix) ->
@@ -84,9 +88,9 @@ table_name(Path, Suffix) ->
 
 -spec info(Report :: report_info ) -> [ { Table_type:: atom(), [ { Prop_name :: atom(), Value :: term() } ] } ].
 info(Report) ->
-  [ { counter, dets:info(Report#report_info.counters) } ,
-    { map, dets:info(Report#report_info.map) },
-    { index, dets:info(Report#report_info.index) }
+  [ { counter, dets:info(Report#report_info.counters_data) } ,
+    { map, dets:info(Report#report_info.map_data) },
+    { index, dets:info(Report#report_info.index_data) }
   ].
 
 -spec files_size(Report :: report_info | string() )  -> { ok, non_neg_integer() } | { error, undefined }.
@@ -118,7 +122,12 @@ counter_inc(Report, Key, [ Subkey | Subkey_list ], Steps) ->
   counter_inc(Report, NewKey, Subkey_list, Steps).
 
 counter_get(Report, Key) ->
-  estats_counter:get_value(Report#report_info.counters, Key).
+  case estats_counter:get_value(ets, Report#report_info.counters, Key) of
+    0 -> estats_counter:get_value(dets, Report#report_info.counters_data, Key);
+    Ets ->
+      Dets = estats_counter:get_value(dets, Report#report_info.counters_data, Key),
+      estats_counter:step_sum(Ets, Dets)
+  end.
 
 counters_list_get(Report, Keys) ->
   [ { Key, counter_get(Report, Key) } || Key <- Keys ].
@@ -186,14 +195,16 @@ map_save(Report, Limit, Key, Data) ->
   L = if
         is_integer(Limit) ->
           { Limit, fun(R, K, D) ->
-            dets:member(R#report_info.map, subkey(K, D))
+            Key0 = subkey(K, D),
+            ets:member(R#report_info.map, Key0) orelse
+              dets:member(R#report_info.map_data, Key0 )
           end };
         true -> infinity
       end,
   case index_add_limit(Report, L, Key, Hash) of
     limit -> limit;
     ok ->
-      ok = dets:insert(Report#report_info.map, { subkey(Key, Hash) , Data }),
+      ets:insert(Report#report_info.map, { subkey(Key, Hash) , Data }),
       { ok, Hash };
     exists ->
       { exists, Hash }
@@ -204,8 +215,12 @@ map_load(Report, Key, Hash) ->
   map_load(Report, subkey(Key, Hash)).
 
 map_load(Report, Key) ->
-  case dets:lookup(Report#report_info.map, Key ) of
-    [ ] -> none;
+  case ets:lookup(Report#report_info.map, Key ) of
+    [ ] ->
+        case dets:lookup(Report#report_info.map_data, Key) of
+          [ ] -> [ ];
+          [ A ] -> A
+        end;
     [ A ] -> A
   end.
 
@@ -222,11 +237,8 @@ map_hash_list(List) when is_list(List) ->
 map_hash_list(Term) ->
   map_hash_list([Term]).
 
-map_list(Report, Key) when is_list(Key)->
-  dets:lookup(Report#report_info.index, Key).
-
 index_add(Report, Key, Data) ->
-  ok = dets:insert(Report#report_info.index, { Key, Data } ),
+  ets:insert(Report#report_info.index, { Key, Data } ),
   ok.
 
 %% Добавить Data в индекс Key с учетом лимита Limit
@@ -241,8 +253,14 @@ index_add_limit(Report, { Limit, ExistsFun }, Key, Data) when is_integer(Limit),
   case ExistsFun(Report, Key, Data) of
     false ->
       CountKey = { index_count, Key },
-      Count = case dets:lookup(Report#report_info.map, CountKey) of
-        [ ] -> 0;
+      Count = case ets:lookup(Report#report_info.map, CountKey) of
+        [ ] -> case dets:lookup(Report#report_info.map_data, CountKey) of
+          [ ] -> 0;
+          [ Term ] ->
+            ets:insert(Report#report_info.map, Term),
+            { _ , A } = Term,
+            A
+        end;
         [ {  _ , A } ] -> A
       end,
 
@@ -252,26 +270,18 @@ index_add_limit(Report, { Limit, ExistsFun }, Key, Data) when is_integer(Limit),
           ok = index_add(Report, Key, Data),
           if
             Count =:= 0 ->
-              ok = dets:insert(Report#report_info.map, { CountKey, 1 });
+              true = ets:insert(Report#report_info.map, { CountKey, 1 });
             true ->
-              dets:update_counter(Report#report_info.map, CountKey, 1)
+              ets:update_counter(Report#report_info.map, CountKey,  {2,1})
           end,
           ok
       end;
     true -> exists
   end.
 
--spec index_size(Report :: report_info, Key :: term()) -> integer().
-index_size(Report, Key) ->
-  case dets:lookup(Report#report_info.map, { index_count, Key }) of
-    [ ] ->
-      length(index_get(Report, Key ));
-    [ { _, Count } ] when is_integer(Count) -> Count
-  end.
-
 
 index_lookup(Report, Key) ->
-  dets:lookup(Report#report_info.index, Key).
+  lists:usort(ets:lookup(Report#report_info.index, Key) ++ dets:lookup(Report#report_info.index_data, Key)).
 
 index_get(Report, Keys) when is_list(Keys)->
   [ subkey(Key0,Data0) || { Key0 , Data0 } <- lists:flatten([ index_lookup(Report, Key) || Key <- Keys ]) ].
