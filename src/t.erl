@@ -8,9 +8,9 @@
 -export([t/0, t0/2, t1/3, t2/3]).
 
 t() ->
-  erlang:spawn(fun() ->
+  erlang:spawn_link(fun() ->
     error_logger:info_report({tc, timer:tc(fun() ->
-      clicks(estats_offer_server:pid(), 1000000)
+        clicks(estats_offer_server:pid(), 5000000)
     end)})
   end).
 
@@ -37,34 +37,39 @@ clicks(Pid, N) ->
   clicks(Pid, N-1).
 
 random_click() ->
-  Date = { 2013, random:uniform(2), random:uniform(28) },
-  #click_info {
-    id = random:uniform(10000),
-    offer_id = random:uniform(2),
-    offer_url_id = random:uniform(4),
-  % banner id (не реализовано)
-    affiliate_id = random:uniform(2),
-    advertiser_id = random:uniform(2),
-    subid = dict:from_list([
-      { 1, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>}) },
-      { 2, random_prop({<<"1">>, <<"2">>}) },
-      { 3, random_prop({<<"1">>, <<"2">>}) },
-      { 4, random_prop({<<"1">>, <<"2">>}) },
-      { 5, random:uniform(10000) }
-    ]),  % Список subid
-    http_referer = <<"http://referer.com/hello/world?hi=123">>,
-    domain = << <<"referer">>/binary, (erlang:integer_to_binary(random:uniform(10000)))/binary, <<".com">>/binary >>,
-    user_agent = <<"Unknown">>,
-    ip = <<"10.123.123.54">>,
-    year = date:year(Date),
-    month = date:month(Date), %random:uniform(2),
-    day = date:day(Date), %random:uniform(30),
-    day_number = calendar:date_to_gregorian_days(Date),
-    day_of_week = calendar:day_of_the_week(Date),
-    hour = random:uniform(24) - 1,
-    date = Date,
-    is_unique = (random:uniform(1000) rem 2) == 0
-  }.
+  %%Date = { 2013, random:uniform(3),random:uniform(31) },
+  Date = { 2013, 2, 3 },
+  case date:is_valid(Date) of
+    false -> random_click();
+    true ->
+      #click_info {
+        id = random:uniform(10000),
+        offer_id = random:uniform(25),
+        offer_url_id = random:uniform(40),
+      % banner id (не реализовано)
+        affiliate_id = random:uniform(2000),
+        advertiser_id = random:uniform(15),
+        subid = dict:from_list([
+          { 1, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>}) },
+          { 2, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>}) },
+          { 3, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>}) },
+          { 4, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>}) },
+          { 5, random:uniform(10000) }
+        ]),  % Список subid
+        http_referer_hash = erlang:phash2(<<"http://referer.com/hello/world?hi=123">>),
+        domain = << <<"referer">>/binary, (erlang:integer_to_binary(random:uniform(10000)))/binary, <<".com">>/binary >>,
+        user_agent = <<"Unknown">>,
+        ip = <<"10.123.123.54">>,
+        year = date:year(Date),
+        month = date:month(Date), %random:uniform(2),
+        day = date:day(Date), %random:uniform(30),
+        day_number = calendar:date_to_gregorian_days(Date),
+        day_of_week = calendar:day_of_the_week(Date),
+        hour = random:uniform(24) - 1,
+        date = Date,
+        is_unique = (random:uniform(1000) rem 2) == 0
+      }
+  end.
 
 random_prop(Tuple) ->
   element(random:uniform(tuple_size(Tuple)), Tuple).

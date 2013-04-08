@@ -4,74 +4,69 @@
 -include("include/report_info.hrl").
 
 %% API
--export([flush/1, close/1, start_link/0]).
+-export([flush/2, start_link/0, send_sync/2]).
 
 -behaviour(gen_server).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
 -record(state, { }).
-
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
 
 start_link() ->
   gen_server:start_link(?MODULE, {}, []).
 
--spec flush(Report :: report_info ) -> {ok, report_info} | { error, Reason :: term() }.
-flush(Report) when Report#report_info.counters =:= none, Report#report_info.map =:= none, Report#report_info.index =:= none -> { ok, Report };
-flush(Report) ->
-  give_ets(Report),
-  gen_server:cast(pid(), { sync, Report }),
-  { ok, Report#report_info{
-    counters = none,
-    map = none,
-    index = none
-  }}.
+-spec flush(PidSup :: pid(), Report :: report_info ) -> {ok, report_info }.
+flush(PidSup, Report) ->
+  case estats_report:is_ets_empty(Report) of
+    false ->
+      estats_rsaver_sup:sync_task(PidSup, { ets, counter, Report#report_info.counters, Report#report_info.counters_data }),
+      estats_rsaver_sup:sync_task(PidSup, { ets, index, Report#report_info.index, Report#report_info.index_data }),
+      estats_rsaver_sup:sync_task(PidSup, { ets, map, Report#report_info.map, Report#report_info.map_data }),
+      { ok, Report#report_info{
+          counters = undefined,
+          map = undefined,
+          index = undefined
+      }};
+    true -> { ok, Report }
+  end.
 
-close(Report) ->
-  give_ets(Report),
-  gen_server:cast(pid(), { close, Report }),
-  ok.
+
 
 init(_Options) ->
-  gproc:add_local_name(rsaver),
   { ok, #state{} }.
 
-handle_cast({ sync, Report }, State) ->
+handle_cast({ sync, { counter, Ets, Dets } }, State) ->
   ok = ets:foldl(fun(Term, _) ->
     Key = element(1,Term),
-    case dets:lookup(Report#report_info.counters_data, Key) of
+    case estats_table:lookup(dets, Dets, Key) of
       [ ] ->
-        dets:insert(Report#report_info.counters_data, Term);
+        dets:insert(Dets, Term);
       [ Tuple ] when is_tuple(Tuple) ->
-        dets:insert(Report#report_info.counters_data, list_to_tuple(
+        dets:insert(Dets, list_to_tuple(
           [ Key | estats_counter:step_sum(estats_counter:tuple_to_value_list(Tuple), estats_counter:tuple_to_value_list(Term) )]
         ))
     end,
     ok
-  end, ok, Report#report_info.counters),
-  dets:sync(Report#report_info.counters_data),
-  ets:delete(Report#report_info.counters),
+  end, ok, Ets),
+  ets:delete(Ets),
+  dets:sync(Dets),
+  { stop, normal, State };
 
+handle_cast({sync, { index, Ets, Dets }}, State) ->
   ok = ets:foldl(fun({Key, Value}, _) ->
-    dets:insert(Report#report_info.index_data, { Key, Value })
-  end, ok, Report#report_info.index),
-  dets:sync(Report#report_info.index_data),
-  ets:delete(Report#report_info.index),
+    dets:insert(Dets, { Key, Value })
+  end, ok, Ets),
+  ets:delete(Ets),
+  dets:sync(Dets),
+  { stop, normal, State };
 
+handle_cast({sync, { map, Ets, Dets }}, State) ->
   ok = ets:foldl(fun({Key, Value}, _) ->
-    dets:insert(Report#report_info.map_data, { Key, Value })
-  end, ok, Report#report_info.map),
-  dets:sync(Report#report_info.map_data),
-  ets:delete(Report#report_info.map),
-
-  { noreply, State };
-
-handle_cast({close, Report}, State) ->
-  { noreply , NewState } = handle_cast({sync, Report}, State),
-  dets:close(Report#report_info.counters_data),
-  dets:close(Report#report_info.index_data),
-  dets:close(Report#report_info.map_data),
-  { noreply, NewState };
+    dets:insert(Dets, { Key, Value })
+  end, ok, Ets),
+  ets:delete(Ets),
+  dets:sync(Dets),
+  { stop, normal, State };
 
 handle_cast( _, State) -> { noreply, State }.
 
@@ -83,12 +78,7 @@ code_change(_, State, _) -> { ok, State }.
 
 terminate(_, _State) -> ok.
 
-pid() ->
-  gproc:lookup_local_name(rsaver).
+send_sync(Pid, { ets, Type, Ets, Dets} ) ->
+  ets:give_away(Ets, Pid, {}),
+  gen_server:cast(Pid, { sync, { Type, Ets, Dets } }).
 
-
-give_ets(Report) ->
-  ets:give_away(Report#report_info.counters, pid(), {}),
-  ets:give_away(Report#report_info.map, pid(), {}),
-  ets:give_away(Report#report_info.index, pid(), {}),
-  ok.

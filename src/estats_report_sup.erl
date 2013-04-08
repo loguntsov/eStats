@@ -26,11 +26,11 @@ list(Pid) ->
 
 -spec pids(Pid :: pid()) -> [ Pid :: pid() ].
 pids(Pid) ->
-  [ Pid_child || {_Id, Pid_child, _Type, _Modules} <- supervisor:which_children(Pid) ].
+  [ Pid_child || {_Id, Pid_child, _Type, _Modules} <- supervisor:which_children(Pid), is_pid(Pid_child) ].
 
 -spec pid_module(Pid :: pid(), Module :: atom()) -> { ok, Pid :: pid() } | {error, undefined}.
 pid_module(Pid, Module) ->
-  Ret = [ Pid_child || { M, Pid_child, _Type, _Modules} <- supervisor:which_children(Pid), M =:= Module ],
+  Ret = [ Pid_child || { M, Pid_child, _Type, _Modules} <- supervisor:which_children(Pid), M =:= Module, is_pid(Pid_child) ],
   case Ret of
     [ P ] -> {ok, P };
     [ ] -> { error, undefined }

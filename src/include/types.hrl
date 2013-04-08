@@ -11,5 +11,6 @@
 -type( date_period() :: { From :: date(), To :: date() }).
 -type( date_list() :: [ date() ]).
 -type( proplist() :: [ { Key :: term(), Value :: term() } ]).
+-type( timestamp() :: {_MegaSecs :: integer(), _Secs :: integer(), _MicroSecs :: integer() } ).
 -endif. % TYPES_HRL
 

@@ -6,20 +6,17 @@
 
 %% API
 
--export([start_link/3, click/2, report/2, sync/1]).
+-export([start_link/3, click/2, report/2]).
 
 -behaviour(gen_server).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
 -record(state,{
-  reports :: dict(),
-  dates :: dict(),
   report_module :: atom(),
   mode :: atom(),
   path :: string(),
-  report_mode :: [],
-  save_interval :: integer()
+  report_mode :: []
 }).
 
 -define(REPORT_MAX_SIZE, 536870912). % Максимальный размер файлов отчета за период (512 мб)
@@ -37,18 +34,14 @@
 init({Module, Path, Mode}) ->
   %process_flag(trap_exit, true),
   gproc:add_local_name({Module, Mode}),
-  sync_tick(60),
   {ok, #state{
     report_module = Module,
-    reports = dict:new(),
-    dates = dict:new(),
     mode = Mode,
     path = Path,
     report_mode = [
       { mode , Mode },
       { save_interval, 60 }
-    ],
-    save_interval = 60
+    ]
   }}.
 
 
@@ -72,29 +65,20 @@ click(Pid, Click) ->
 report(Pid, Query) ->
   gen_server:call(Pid, { report, Query}).
 
-sync(Pid) ->
-  Pid ! sync.
-
 handle_cast({click, Click}, State) when State#state.mode =/= readonly ->
-  { NewState, Report } = get_report(Click#click_info.date, State),
-  estats_report:index_add(Report, dates_info, Click#click_info.date ),
-  ok = (State#state.report_module):handle_click(Click, Report),
-  {noreply, NewState};
+  Pid = get_report_pid(Click#click_info.date, State),
+  ok = estats_subreport_server:click(Pid, Click),
+  {noreply, State};
 
 handle_cast(_, State) -> { noreply, State }.
 
-handle_call({report, {Type, Period, Query } }, _From, State_main) ->
-%  {ok, _Input, Output} =(State_main#state.report_module):handle_info(Type),
+handle_call({report, {Type, Period, Query } }, _From, State) ->
 
-  { NewState, Reports } =
-    lists:foldl(fun(Date, { State, Reports }) ->
-      { NewState, Report} = get_report(Date, State),
-      case Report of
-        R when is_record(R, report_info) ->
-          { NewState, dict:append(R, Date, Reports) };
-        _ -> { NewState, Reports }
-      end
-    end, { State_main, dict:new() },Period),
+  SubReports =
+    lists:foldl(fun(Date, Dict) ->
+      Pid = get_report_pid(Date, State),
+      dict:append(Pid, Date, Dict)
+    end, dict:new() ,Period),
 
 %% Последовательное выполнение запросов
 %%     Result = lists:map(fun({Report, Dates}) ->
@@ -106,16 +90,12 @@ handle_call({report, {Type, Period, Query } }, _From, State_main) ->
 %%     end, dict:to_list(Reports)),
 
 %% Параллельное выполнение запросов
-    {Collector, _ } = lists:mapfoldl(fun({Report, Dates}, Acc) ->
-      { { Acc, { Report, NewState#state.report_module, {Type, Dates, Query } } }, Acc+1 }
-    end,0,dict:to_list(Reports)),
+    {Collector, _ } = lists:mapfoldl(fun({Pid, Dates}, Acc) ->
+      { { Acc, { Pid, {Type, Dates, Query } } }, Acc+1 }
+    end,0,dict:to_list(SubReports)),
 
-    Result = code_collector:start(fun({Report, Module, QueryAll}) ->
-      try
-        Module:handle_report(QueryAll, Report)
-      catch
-        error:function_clause -> { error, report_unknown, QueryAll }
-      end
+    Result = code_collector:start(fun({Pid, QueryAll}) ->
+      estats_subreport_server:report(Pid, QueryAll)
     end, Collector),
 
     R = case Result of
@@ -128,122 +108,78 @@ handle_call({report, {Type, Period, Query } }, _From, State_main) ->
         };
       {error, Reason } -> { error, Reason }
     end,
-    {reply, R , NewState};
+    {reply, R , State};
 
 handle_call( state, _From, State) ->
   {reply, State , State}.
-
-handle_info(sync, State) ->
-  Reports = dict:map(fun(_, Report) ->
-    estats_report:sync(Report)
-  end, State#state.reports),
-  sync_tick(State#state.save_interval),
-  { noreply, State#state { reports = Reports } };
 
 handle_info(_, State) -> { noreply, State }.
 
 code_change(_, State, _) -> { ok, State}.
 
-terminate(_, State) ->
-  dict:map(fun(_Index, Report) ->
-    estats_report:close(Report)
-  end, State#state.reports),
+terminate(_, _State) ->
   ok.
 
-
-get_report(Date, State) ->
-  Report = case dict:find(Date, State#state.dates) of
-    {ok,RefReport} when is_reference(RefReport) ->
-      case dict:find(RefReport, State#state.reports) of
-        { ok, R } -> R;
-        error -> error
-      end;
-    {ok, Data} -> Data;
-    error -> error
-  end,
-  case Report of
-    error ->
-      get_report_from_storage(Date, State);
-    R0 -> {State, R0}
-  end.
-
-get_report_from_storage(Date, State) ->
-  Key = get_storage_key(Date, State),
-  Path = case estats_storage:get(Key) of
+-spec get_report_pid(Date :: date(), State :: state) -> pid() | undefined.
+get_report_pid(Date, #state{ report_module=Type, path=MainPath, mode=Mode } = _State) ->
+  case estats_subreport_server:get_pid_by_date(Type, Date) of
+    Pid when is_pid(Pid) -> Pid;
     undefined ->
-      case find_prev_report(Date, State, ?REPORT_MAX_DATE_LENGHT ) of
-        undefined when State#state.mode =/= readonly ->
-          make_report(Date, State);
-        P -> P
-      end;
-    P -> {ok, P}
-  end,
-  case Path of
-    { error, readonly } ->
-      { State#state{
-          dates = dict:store(Date, undefined , State#state.dates)
-        },
-        undefined
-      };
-    { ok, undefined } ->
-      { State, undefined };
-    { ok, Ref } when is_reference(Ref) ->
-      { State#state{
-          dates = dict:store(Date, Ref, State#state.dates)
-        },
-        dict:fetch(Ref, State#state.reports)
-      };
-    { ok, Path1 } when is_list(Path1) ->
-      {ok, Report } = estats_report:open(Path1, State#state.report_mode),
-      Ref = make_ref(),
-      { State#state{
-          dates = dict:store(Date, Ref, State#state.dates),
-          reports = dict:store(Ref, Report, State#state.reports)
-        },
-        Report
-      };
-    { ok, ReportMainDate, Path1 } when is_list(Path1) ->
-      {ok, Report } = estats_report:open(Path1, State#state.report_mode),
-      Ref = make_ref(),
-      { State#state{
-          dates = dict:store(Date, Ref, dict:store(ReportMainDate, Ref, State#state.dates)),
-          reports = dict:store(Ref, Report, State#state.reports)
-        },
-        Report
-      }
-  end.
-
-make_report(_Date, State) when State#state.mode =:= readonly -> { error, readonly };
-make_report(Date, State) ->
-  P = lists:concat([State#state.path, "/", atom_to_list(State#state.report_module), "/", date:to_string(Date,"/")]),
-  ok = make_report_dir(P),
-  Key = get_storage_key(Date, State),
-  estats_storage:put(Key, P),
-  { ok, P }.
-
-find_prev_report(_Date, _State, 0) -> undefined;
-find_prev_report(Date, State, Limit) ->
-  NewDate = date:next_days(Date, -1),
-  Key = get_storage_key(NewDate, State),
-  case estats_storage:get(Key) of
-    undefined -> find_prev_report(NewDate, State, Limit -1);
-    Path when is_list(Path) ->
-      case dict:find(NewDate, State#state.dates) of
-        { ok, Ref } when is_reference(Ref)-> { ok, Ref };
-        error ->
-          case  estats_report:files_size(Path) of
-            {ok, Size } ->
-              if
-                Size < ?REPORT_MAX_SIZE -> {ok, NewDate, Path};
-                true -> undefined
-              end;
-            _ -> undefined
-          end
+      case get_report_path(MainPath, Type, Date, Mode) of
+        { error, _ } -> undefined;
+        { ok, Path } ->
+          Pid0 = case estats_subreport_server:get_pid_by_path(Type, Path) of
+            undefined ->
+              estats_subreport_server:create(Type, Path, Mode);
+            Pid when is_pid(Pid) -> Pid
+          end,
+          ok = estats_subreport_server:register(Pid0, Date),
+          Pid0
       end
   end.
 
-get_storage_key(Date, State) ->
-  {report, State#state.report_module, Date}.
+get_report_path(MainPath, Type, Date, Mode) ->
+  Key = get_storage_key(Type, Date),
+  case estats_storage:get(Key) of
+    undefined ->
+      case find_prev_report_path(Type, Date) of
+        { ok, Path } ->
+          case  estats_report:files_size(Path) of
+            {ok, Size } ->
+              if
+                Size < ?REPORT_MAX_SIZE -> {ok, Path};
+                true -> make_report_path(MainPath, Type, Date, Mode)
+              end;
+            _ -> make_report_path(MainPath, Type, Date, Mode)
+          end;
+        { error, not_found } ->
+          make_report_path(MainPath, Type, Date, Mode)
+      end;
+    Path when is_list(Path) -> {ok, Path }
+  end.
+
+make_report_path(_Path, _Type, _Date, Mode ) when Mode =:= readonly -> { error, readonly };
+make_report_path(Path, Type, Date, _ ) ->
+  P = lists:concat([Path, "/", atom_to_list(Type), "/", date:to_string(Date,"/")]),
+  ok = make_report_dir(P),
+  Key = get_storage_key(Type, Date),
+  estats_storage:put(Key, P),
+  { ok, P }.
+
+find_prev_report_path(Type, Date) ->
+  find_prev_report_path(Type, Date, 30).
+
+find_prev_report_path(_Type, _Date, 0) -> { error, not_found };
+find_prev_report_path(Type, Date, Number) ->
+  Key = get_storage_key(Type, Date),
+  case estats_storage:get(Key) of
+    undefined -> find_prev_report_path(Type, date:next_days(Date, -1), Number - 1);
+    Path when is_list(Path) -> {ok, Path}
+  end.
+
+
+get_storage_key(Type, Date) ->
+  {report, Type, Date}.
 
 make_report_dir([]) -> { error, enoent};
 make_report_dir(Path) ->
@@ -255,6 +191,3 @@ make_report_dir(Path) ->
         Error -> Error
       end
   end.
-
-sync_tick(Interval) ->
-  timer:send_after(Interval * 1000, sync).

@@ -49,17 +49,12 @@ inc(Table, Key, Steps) when is_list(Steps) ->
 
 -spec get_value(Type :: ets | dets, Table :: term(), Key :: term()) -> integer() | list().
 get_value(Type, Table, Key) ->
-  case lookup(Type, Table, Key) of
+  case estats_table:lookup(Type, Table, Key) of
     [ ] -> 0;
     [ { Key, Value } ] -> Value;
     [ Tuple ] when is_tuple(Tuple) ->
       tuple_to_value_list(Tuple)
   end.
-
-lookup(ets, Table, Key) ->
-  ets:lookup(Table, Key);
-lookup(dets, Table, Key) ->
-  dets:lookup(Table, Key).
 
 tuple_to_value_list(Tuple) ->
   [ _ | Values ] = tuple_to_list(Tuple),

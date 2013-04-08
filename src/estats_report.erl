@@ -9,9 +9,9 @@
 -export([
   map_save/4, map_load/3, map_load/2, map_load_list/2, map_hash/1, map_hash_list/1, index_add/3, index_add_limit/4, subkey/2, index_get/2,
   counter_inc/3, counter_inc/4, counter_get/2, counters_list_get/2, subkey_list/2, subkey_list/1,
-  index_get_all/3, index_get_all/2, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1, sync/1,
+  index_get_all/3, index_get_all/2, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1, create_ets/1,
   key_transform/2, format_key/2, format_tuple/2,
-  sort_by_value/2, value_sum/1
+  sort_by_value/2, value_sum/1, is_ets_empty/1
 ]).
 
 -spec open(Path :: string(), Options :: proplist()) -> {ok, report_info}.
@@ -21,18 +21,19 @@ open(Path, Options) ->
     { mode, readonly } -> readonly;
     _ -> write_mode
   end,
-  SaveInterval = case proplists:lookup( save_interval, Options ) of
-    { save_interval, Interval } -> Interval * 1000;
-    _ -> 60000
-  end,
+%%   SaveInterval = case proplists:lookup( save_interval, Options ) of
+%%     { save_interval, Interval } -> Interval * 1000;
+%%     _ -> 60000
+%%   end,
+  SaveInterval = infinity,
   {ok, Counter_dets } = dets:open_file({counter, Id} , [
     { file, table_name(Path, counter) },
     { type, set },
     { access, case Mode of readonly -> read; _ -> read_write end },
-    { min_no_slots, 2048 },
+    { min_no_slots, 100000 },
     { max_no_slots, default },
     { auto_save, SaveInterval }, % 10 минут интервал
-    { ram_file, Mode =/= readonly },
+    %{ ram_file, Mode =/= readonly },
     { keypos , 1 },
     { repair, true }
   ]),
@@ -40,10 +41,10 @@ open(Path, Options) ->
     { file, table_name(Path, map) },
     { type, set },
     { access, case Mode of readonly -> read; _ -> read_write end },
-    { min_no_slots, 2048 },
+    { min_no_slots, 100000 },
     { max_no_slots, default },
     { auto_save, SaveInterval }, % 10 минут интервал
-    { ram_file, Mode =/= readonly },
+    %{ ram_file, Mode =/= readonly },
     { keypos , 1 },
     { repair, true }
   ]),
@@ -51,36 +52,45 @@ open(Path, Options) ->
     { file, table_name(Path, index) },
     { type, bag },
     { access, case Mode of readonly -> read; _ -> read_write end },
-    { min_no_slots, 2048 },
+    { min_no_slots, 100000 },
     { max_no_slots, default },
     { auto_save, SaveInterval }, % 10 минут интервал
-    { ram_file, Mode =/= readonly },
+    %{ ram_file, Mode =/= readonly },
     { keypos , 1 },
     { repair, true }
   ]),
-  {ok, create_ets(#report_info {
+  {ok, #report_info {
+        counters = undefined,
+        map = undefined,
+        index = undefined,
         path = Path,
         counters_data = Counter_dets,
         map_data = Map_dets,
         index_data = Index_dets
-  })}.
+  }}.
+
+close(Report) ->
+  dets:close(Report#report_info.counters_data),
+  dets:close(Report#report_info.index_data),
+  dets:close(Report#report_info.map_data).
+
+
+-spec is_ets_empty(Report :: report_info) -> boolean() | undefined.
+is_ets_empty(Report) when
+  Report#report_info.counters =:= undefined;
+  Report#report_info.map =:= undefined; Report#report_info.index =:= undefined -> undefined;
+
+is_ets_empty(Report) -> not(
+  ets:info(Report#report_info.counters, size) > 0 andalso
+  ets:info(Report#report_info.map, size) > 0 andalso
+  ets:info(Report#report_info.index, size) > 0).
 
 create_ets(Report) -> Report,
-  { ok, NewReport } = estats_rsaver:flush(Report),
-  NewReport#report_info{
+  Report#report_info{
     counters = ets:new(none, [ set ]),
     map = ets:new(none, [ set ]),
     index = ets:new(none, [ bag ])
   }.
-
--spec close(Report :: report_info) -> ok.
-close(Report) ->
-  ok = estats_rsaver:close(Report).
-
--spec sync(Report :: report_info) -> report_info.
-sync(Report) ->
-  { ok, NewReport } = estats_rsaver:flush(Report),
-  create_ets(NewReport).
 
 -spec table_name(Path :: string(), Suffix::atom()) -> string().
 table_name(Path, Suffix) ->
@@ -210,14 +220,13 @@ map_save(Report, Limit, Key, Data) ->
       { exists, Hash }
   end.
 
-
 map_load(Report, Key, Hash) ->
   map_load(Report, subkey(Key, Hash)).
 
 map_load(Report, Key) ->
-  case ets:lookup(Report#report_info.map, Key ) of
+  case estats_table:lookup(ets, Report#report_info.map, Key ) of
     [ ] ->
-        case dets:lookup(Report#report_info.map_data, Key) of
+        case estats_table:lookup(dets, Report#report_info.map_data, Key) of
           [ ] -> [ ];
           [ A ] -> A
         end;
@@ -253,8 +262,8 @@ index_add_limit(Report, { Limit, ExistsFun }, Key, Data) when is_integer(Limit),
   case ExistsFun(Report, Key, Data) of
     false ->
       CountKey = { index_count, Key },
-      Count = case ets:lookup(Report#report_info.map, CountKey) of
-        [ ] -> case dets:lookup(Report#report_info.map_data, CountKey) of
+      Count = case estats_table:lookup(ets, Report#report_info.map, CountKey) of
+        [ ] -> case estats_table:lookup(dets, Report#report_info.map_data, CountKey) of
           [ ] -> 0;
           [ Term ] ->
             ets:insert(Report#report_info.map, Term),
@@ -281,7 +290,7 @@ index_add_limit(Report, { Limit, ExistsFun }, Key, Data) when is_integer(Limit),
 
 
 index_lookup(Report, Key) ->
-  lists:usort(ets:lookup(Report#report_info.index, Key) ++ dets:lookup(Report#report_info.index_data, Key)).
+  lists:usort(estats_table:lookup(ets, Report#report_info.index, Key) ++ estats_table:lookup(dets, Report#report_info.index_data, Key)).
 
 index_get(Report, Keys) when is_list(Keys)->
   [ subkey(Key0,Data0) || { Key0 , Data0 } <- lists:flatten([ index_lookup(Report, Key) || Key <- Keys ]) ].
