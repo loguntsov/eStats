@@ -1,4 +1,4 @@
-ERL_RUN_ARGS:=-pa ebin -boot start_sasl -config elog -s estats_app
+ERL_RUN_ARGS:=-pa src -pa ebin -pa deps/*/ebin
 
 compile: 
 	@rebar compile
@@ -6,6 +6,7 @@ compile:
 get-deps:
 	@rebar get-deps
 
+.PHONY: test
 test:
 	rebar compile eunit
 
@@ -13,11 +14,11 @@ clean:
 	@rebar clean
 	rm -f erl_crash.dump
 
-run:
-	ERL_LIBS=deps:apps erl $(ERL_RUN_ARGS)
+run: compile
+	erl $(ERL_RUN_ARGS) -s estats_app
 
 background:
-	ERL_LIBS=deps:apps erl -detached $(ERL_RUN_ARGS)
+	run_erl -daemon /tmp/ log/ "erl $(ERL_RUN_ARGS) -sname estats -s estats_app"
 
 d:
 	dialyzer --src -I src
