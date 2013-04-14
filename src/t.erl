@@ -10,7 +10,7 @@
 t() ->
   erlang:spawn_link(fun() ->
     error_logger:info_report({tc, timer:tc(fun() ->
-        clicks(estats_offer_server:pid(), 5000000)
+        clicks(estats_offer_server:pid(), 10000)
     end)})
   end).
 
@@ -47,7 +47,7 @@ random_click() ->
         offer_id = random:uniform(25),
         offer_url_id = random:uniform(40),
       % banner id (не реализовано)
-        affiliate_id = random:uniform(2000),
+        affiliate_id = random:uniform(20),
         advertiser_id = random:uniform(15),
         subid = dict:from_list([
           { 1, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>}) },
@@ -56,7 +56,7 @@ random_click() ->
           { 4, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>}) },
           { 5, random:uniform(10000) }
         ]),  % Список subid
-        http_referer_hash = erlang:phash2(<<"http://referer.com/hello/world?hi=123">>),
+        http_referer_hash = erlang:phash2(<< <<"http://referer.com/hello/world?hi=">>/binary, (erlang:integer_to_binary(random:uniform(100)))/binary>>),
         domain = << <<"referer">>/binary, (erlang:integer_to_binary(random:uniform(10000)))/binary, <<".com">>/binary >>,
         user_agent = <<"Unknown">>,
         ip = <<"10.123.123.54">>,
