@@ -32,6 +32,7 @@ start_link(Type, Path, Mode) ->
 }).
 
 init({Type, Path, Mode }) ->
+  process_flag(trap_exit, true),
   gproc:add_local_name({report_path, Type, Path}),
   {ok, SupPid } = estats_rsaver_sup:start_link(),
   {ok , Report } = estats_report:open(Path, [{ mode, Mode}]),
@@ -134,8 +135,8 @@ handle_info(_Info, State) ->
 
 terminate(_Reason, State) ->
   {ok, NewReport } = estats_rsaver:flush(State#state.rsaver_sup,State#state.report),
-  estats_report:close(NewReport),
   ensure_task_done(State#state.rsaver_sup),
+  estats_report:close(NewReport),
   ok.
 
 ensure_task_done(RsaverSupPid) ->

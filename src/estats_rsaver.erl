@@ -18,19 +18,17 @@ start_link() ->
 -spec flush(PidSup :: pid(), Report :: report_info ) -> {ok, report_info }.
 flush(PidSup, Report) ->
   case estats_report:is_ets_empty(Report) of
-    false ->
+    undefined -> { ok, Report };
+    _ ->
       estats_rsaver_sup:sync_task(PidSup, { ets, counter, Report#report_info.counters, Report#report_info.counters_data }),
       estats_rsaver_sup:sync_task(PidSup, { ets, index, Report#report_info.index, Report#report_info.index_data }),
       estats_rsaver_sup:sync_task(PidSup, { ets, map, Report#report_info.map, Report#report_info.map_data }),
       { ok, Report#report_info{
-          counters = undefined,
-          map = undefined,
-          index = undefined
-      }};
-    true -> { ok, Report }
+        counters = undefined,
+        map = undefined,
+        index = undefined
+      }}
   end.
-
-
 
 init(_Options) ->
   { ok, #state{} }.

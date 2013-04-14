@@ -38,10 +38,11 @@ start(_Type, _StartArgs) ->
 %% Returns: any
 %%----------------------------------------------------------------------
 prep_stop(State) ->
-  ok = supervisor:terminate_child(State#state.pid, estats_redis_sup),
+  supervisor:terminate_child(State#state.pid, estats_redis_sup),
   io:format("eStats wait 10 seconds ...~n"),
   timer:sleep(10000),
   io:format("eStats save cached info ...~n"),
+  estats_subreport_sup:exit(),
   estats_subreport_sup:ensure_no_child(),
   State.
 

@@ -3,7 +3,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, start_child/3, ensure_no_child/0]).
+-export([start_link/0, start_child/3, ensure_no_child/0, exit/0]).
 
 %% supervisor
 -export([init/1]).
@@ -22,6 +22,12 @@ ensure_no_child() ->
       timer:sleep(100),
       ensure_no_child()
   end.
+
+exit() ->
+  lists:map(fun({ _, Pid, _, _} ) ->
+    supervisor:terminate_child(?MODULE, Pid)
+  end, supervisor:which_children(?MODULE)),
+  ok.
 
 %% supervisor callbacks
 init([]) ->
