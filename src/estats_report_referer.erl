@@ -43,5 +43,5 @@ handle_report({domain_top, Period, { _Order_pos, Affiliate } }, Report) ->
 
 handle_report({referer_top, Period, { _Order_pos, Affiliate } }, Report) ->
   Keys = estats_report:index_get_all(Report, [ c, Period , Affiliate ]),
-  Counters = estats_report:counters_list_get(Report, Keys),
+  Counters = [ { Hash, Value} || { [ _,_,_, Hash ], Value } <- estats_report:counters_list_get(Report, Keys) ],
   { ok, Counters }.
