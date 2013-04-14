@@ -12,5 +12,10 @@
 -type( date_list() :: [ date() ]).
 -type( proplist() :: [ { Key :: term(), Value :: term() } ]).
 -type( timestamp() :: {_MegaSecs :: integer(), _Secs :: integer(), _MicroSecs :: integer() } ).
+
+-type(counter_value() :: integer() | [ integer() ]).
+-type(counter_key() :: [ ]).
+-type(counter() :: { counter_key(), counter_value() }).
+-type(counter_subkey() :: counter_key()).
 -endif. % TYPES_HRL
 

@@ -33,7 +33,7 @@ open(Path, Options) ->
     { min_no_slots, 100000 },
     { max_no_slots, default },
     { auto_save, SaveInterval }, % 10 минут интервал
-    %{ ram_file, Mode =/= readonly },
+    { ram_file, Mode =/= readonly },
     { keypos , 1 },
     { repair, true }
   ]),
@@ -44,7 +44,7 @@ open(Path, Options) ->
     { min_no_slots, 100000 },
     { max_no_slots, default },
     { auto_save, SaveInterval }, % 10 минут интервал
-    %{ ram_file, Mode =/= readonly },
+    { ram_file, Mode =/= readonly },
     { keypos , 1 },
     { repair, true }
   ]),
@@ -55,7 +55,7 @@ open(Path, Options) ->
     { min_no_slots, 100000 },
     { max_no_slots, default },
     { auto_save, SaveInterval }, % 10 минут интервал
-    %{ ram_file, Mode =/= readonly },
+    { ram_file, Mode =/= readonly },
     { keypos , 1 },
     { repair, true }
   ]),
@@ -119,10 +119,11 @@ files_size(Path) when is_list(Path) ->
   end.
 
 
-
+-spec counter_inc(report_info, counter_subkey(), counter_subkey()) -> ok.
 counter_inc(Report, Key, Subkey) ->
   counter_inc(Report, Key, Subkey, 1).
 
+-spec counter_inc(report_info, counter_subkey(), counter_subkey(), counter_value()) -> ok.
 counter_inc( _Report, _Key, [], _Step ) -> ok;
 
 counter_inc(Report, Key, [ Subkey | Subkey_list ], Steps) ->
@@ -131,6 +132,7 @@ counter_inc(Report, Key, [ Subkey | Subkey_list ], Steps) ->
   estats_counter:inc(Report#report_info.counters, NewKey, Steps),
   counter_inc(Report, NewKey, Subkey_list, Steps).
 
+-spec counter_get(report_info, counter_key())-> counter_value().
 counter_get(Report, Key) ->
   case estats_counter:get_value(ets, Report#report_info.counters, Key) of
     0 -> estats_counter:get_value(dets, Report#report_info.counters_data, Key);
@@ -139,6 +141,7 @@ counter_get(Report, Key) ->
       estats_counter:step_sum(Ets, Dets)
   end.
 
+-spec counters_list_get(report_info, [ counter_key() ]) -> [ counter() ].
 counters_list_get(Report, Keys) ->
   [ { Key, counter_get(Report, Key) } || Key <- Keys ].
 
