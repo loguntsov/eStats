@@ -14,7 +14,7 @@
   code_change/3]).
 
 -define(USE_TIMEOUT, 5). %% Время бездействия, до выключения данного субсервера, в минутах
--define(SAVE_TIMEOUT, 5). %% Время между двумя попытками записать данные на диск.
+-define(SAVE_TIMEOUT, 6000). %% Время между двумя попытками записать данные на диск, мс.
 
 %% API
 start_link(Type, Path, Mode) ->
@@ -35,7 +35,7 @@ init({Type, Path, Mode }) ->
   process_flag(trap_exit, true),
   gproc:add_local_name({report_path, Type, Path}),
   {ok, SupPid } = estats_rsaver_sup:start_link(),
-  {ok , Report } = estats_report:open(Path, [{ mode, Mode}]),
+  {ok , Report } = estats_report:open(Type, Path, [{ mode, Mode}]),
   tick(),
   {ok, #state{
     save_tick = false,
@@ -79,12 +79,12 @@ report(Pid, Query) ->
   gen_server:call(Pid, { report, Query }).
 
 handle_call({register, Date }, _From, State) ->
-  gproc:add_local_name({report_date, State#state.type, Date}),
+  gproc:add_local_name({report_date, State#state.report#report_info.module, Date}),
   { reply, ok, State };
 
 handle_call({report, QueryAll}, _From, State) ->
   Result = try
-    (State#state.type):handle_report(QueryAll, State#state.report)
+    (State#state.report#report_info.module):handle_report(QueryAll, State#state.report)
   catch
     error:function_clause -> { error, report_unknown, QueryAll }
   end,
@@ -100,7 +100,7 @@ handle_cast({click, Click }, #state { report = Report } = State) when State#stat
       State
   end,
   estats_report:index_add(NewState#state.report, dates_info, Click#click_info.date ),
-  (NewState#state.type):handle_click(Click, NewState#state.report),
+  (NewState#state.report#report_info.module):handle_click(Click, NewState#state.report),
   {noreply, now_use(NewState)};
 
 handle_cast(_Request, State) ->
@@ -152,7 +152,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 -spec tick() -> ok.
 tick() ->
-  timer:send_after(?SAVE_TIMEOUT * 60000, tick ),
+  timer:send_after(?SAVE_TIMEOUT, tick ),
   ok.
 
 now_use(State) ->

@@ -16,11 +16,13 @@ start() ->
   ok = application:start(crypto),
   ok = application:start(ranch),
 	ok = application:start(cowboy),
+  ok = application:start(emysql),
 	ok = application:start(estats),
 	ok.
 
 stop() ->
   application:stop(estats),
+  application:stop(emysql),
   application:stop(cowboy),
   application:stop(ranch),
   application:stop(crypto),
@@ -62,9 +64,11 @@ restart() ->
 
 init(Options) ->
   Redis = proplists:get_value( redis, Options ),
-  {path, Path} = proplists:lookup( path, Options),
+  Path = proplists:get_value( path, Options, "data/"),
   {http_port, HttpPort} = proplists:lookup( http_port, Options),
+  {mysql, Db } = proplists:lookup(mysql, Options),
 
+  ok = mysql:start(Db),
   Dispatch = cowboy_router:compile([
     {'_', [
       {"/", estats_cowboy_http_handler, []},

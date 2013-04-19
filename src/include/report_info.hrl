@@ -2,6 +2,7 @@
 -include("include/types.hrl").
 
 -record(report_info, {
+  module :: module(),
   path :: string(),
   counters :: undefined | tid(),
   map :: undefined | tid(),

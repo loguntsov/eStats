@@ -9,13 +9,13 @@
 -export([
   map_save/4, map_load/3, map_load/2, map_load_list/2, map_hash/1, map_hash_list/1, index_add/3, index_add_limit/4, subkey/2, index_get/2,
   counter_inc/3, counter_inc/4, counter_get/2, counters_list_get/2, subkey_list/2, subkey_list/1,
-  index_get_all/3, index_get_all/2, index_lookup/2, group/2, subkey_swap/2, open/2, close/1, files_size/1, info/1, create_ets/1,
+  index_get_all/3, index_get_all/2, index_lookup/2, group/2, subkey_swap/2, open/3, close/1, files_size/1, info/1, create_ets/1,
   key_transform/2, format_key/2, format_tuple/2,
   sort_by_value/2, value_sum/1, is_ets_empty/1
 ]).
 
--spec open(Path :: string(), Options :: proplist()) -> {ok, report_info}.
-open(Path, Options) ->
+-spec open(module(), Path :: string(), Options :: proplist()) -> {ok, report_info}.
+open(Module, Path, Options) ->
   Id = make_ref(),
   Mode = case proplists:lookup(mode, Options) of
     { mode, readonly } -> readonly;
@@ -60,6 +60,7 @@ open(Path, Options) ->
     { repair, true }
   ]),
   {ok, #report_info {
+        module = Module,
         counters = undefined,
         map = undefined,
         index = undefined,

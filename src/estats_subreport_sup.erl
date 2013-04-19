@@ -31,7 +31,7 @@ exit() ->
 
 %% supervisor callbacks
 init([]) ->
-  {ok, {{simple_one_for_one, 5, 10}, [
+  {ok, {{simple_one_for_one, 1, 10}, [
     { none, { estats_subreport_server, start_link, [] }, temporary, 600 * 1000 , worker, [] }
   ]}}.
 

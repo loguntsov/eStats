@@ -23,7 +23,8 @@ init({Path}) ->
     estats_report_count,
     estats_report_subid,
     estats_report_total,
-    estats_report_referer
+    estats_report_referer,
+    estats_report_landing
   ], Path, write),
   {ok, #state{
     reports_sup = Pid,
