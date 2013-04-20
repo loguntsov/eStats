@@ -5,6 +5,7 @@
 -include("include/types.hrl").
 -include("include/click_info.hrl").
 -include("include/report_info.hrl").
+-include("include/logger.hrl").
 
 %% API
 -export([start_link/3, create/3, get_pid_by_date/2, get_pid_by_path/2,click/2, report/2, register/2]).
@@ -101,7 +102,7 @@ handle_cast({click, Click }, #state { report = Report } = State) when State#stat
   end,
   estats_report:index_add(NewState#state.report, dates_info, Click#click_info.date ),
   (NewState#state.report#report_info.module):handle_click(Click, NewState#state.report),
-  {noreply, now_use(NewState)};
+  {noreply, now_use(now_chanded(NewState))};
 
 handle_cast(_Request, State) ->
   {noreply, State}.
@@ -130,6 +131,10 @@ handle_info(tick, State) ->
       { noreply, State }
   end;
 
+handle_info( info, State) ->
+  ?INFO_(State),
+  { noreply, State };
+
 handle_info(_Info, State) ->
   {noreply, State}.
 
@@ -157,4 +162,7 @@ tick() ->
 
 now_use(State) ->
   State#state { last_use = os:timestamp() }.
+
+now_chanded(State) ->
+  State#state { is_changed = true }.
 

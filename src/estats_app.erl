@@ -68,7 +68,6 @@ init(Options) ->
   {http_port, HttpPort} = proplists:lookup( http_port, Options),
   {mysql, Db } = proplists:lookup(mysql, Options),
 
-  ok = mysql:start(Db),
   Dispatch = cowboy_router:compile([
     {'_', [
       {"/", estats_cowboy_http_handler, []},
@@ -80,6 +79,7 @@ init(Options) ->
   ]),
 
   Childs = lists:merge([ [
+    { mysql, { mysql, start_link, [Db] }, permanent, 600*1000, supervisor, []},
     { estats_storage, { estats_storage, start_link, [ ] }, permanent, 5000 , worker, [] },
     { estats_subreport_sup, { estats_subreport_sup, start_link, [ ] }, permanent, 600 * 1000, supervisor, [ ]},
     { estats_offer_server, { estats_offer_server, start_link, [ Path ] }, permanent, 5000 , worker, [] } ],

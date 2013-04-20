@@ -85,10 +85,10 @@ send_sync(Pid, { ets, Type, Module, Ets, Dets} ) ->
   gen_server:cast(Pid, { sync, Module, { Type, Ets, Dets } }).
 
 run_from_report(Module, FuncName, Term) ->
-  ?INFO_({ run_from_report ,  Module, FuncName, Term }),
   try
     ok = Module:FuncName(Term),
     ok
   catch
-    error:function_clause -> ok
+    error:function_clause -> ok;
+    error:undef -> ok
   end.

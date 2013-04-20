@@ -44,11 +44,11 @@ random_click() ->
     true ->
       #click_info {
         id = random:uniform(10000),
-        offer_id = random:uniform(25),
-        offer_url_id = random:uniform(40),
+        offer_id = random:uniform(4),
+        offer_url_id = random:uniform(2),
       % banner id (не реализовано)
-        affiliate_id = random:uniform(20),
-        advertiser_id = random:uniform(15),
+        affiliate_id = random:uniform(4),
+        advertiser_id = random:uniform(2),
         subid = dict:from_list([
           { 1, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>}) },
           { 2, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>}) },
