@@ -20,7 +20,10 @@ clean:
 run: compile
 	erl $(ERL_RUN_ARGS) -s estats_app
 
-background:
+kill:
+	sudo kill `cat estats.pid` || true
+
+background: kill
 	run_erl -daemon /tmp/ log/ "erl $(ERL_RUN_ARGS) -sname estats -s estats_app"
 
 d:

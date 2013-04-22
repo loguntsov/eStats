@@ -31,7 +31,9 @@ stop() ->
 
 start(_Type, _StartArgs) ->
 	{ok, [Options]} = file:consult("estats.conf"),
+  PidFile = proplists:get_value(pid_file, Options, "estats.pid"),
 	{ok, Pid} = supervisor:start_link(?MODULE, Options),
+  file:write_file(PidFile, os:getpid()),
 	io:format("eStats started~n"),
 	{ok, Pid, #state{ pid = Pid } }.
 
