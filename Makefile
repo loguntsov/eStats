@@ -1,17 +1,20 @@
 ERL_RUN_ARGS:=-pa src -pa ebin -pa deps/*/ebin
 
 compile: 
-	@rebar compile
+	@./rebar compile
 
 get-deps:
-	@rebar get-deps
+	@./rebar get-deps
 
 .PHONY: test
 test:
-	rebar compile eunit
+	./rebar compile eunit
+
+update:
+	git reset HEAD --hard
 
 clean:
-	@rebar clean
+	@./rebar clean
 	rm -f erl_crash.dump
 
 run: compile
