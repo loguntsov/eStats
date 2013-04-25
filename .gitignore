@@ -4,3 +4,5 @@
 estats.conf
 *.beam
 /*.dump
+/estats.pid
+
