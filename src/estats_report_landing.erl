@@ -11,8 +11,7 @@ handle_click(Click, Report) ->
   Step = [ 1, estats_click:uniq_step(Click) ],
   Hour = Click#click_info.hour,
   Date = Click#click_info.date,
-  estats_report:counter_inc(Report, [ a, Click#click_info.advertiser_id, Click#click_info.affiliate_id, Click#click_info.offer_id, Click#click_info.offer_url_id ] , [ Date, Hour ], Step ),
-  estats_report:counter_inc(Report, [ b, Click#click_info.advertiser_id, Click#click_info.affiliate_id, Click#click_info.offer_id, Click#click_info.offer_url_id ] , [ { date:year(Date), date:month(Date) } ], Step ),
+  estats_report:counter_inc(Report, [ a, Click#click_info.advertiser_id, Click#click_info.affiliate_id, Click#click_info.offer_id, Click#click_info.offer_url_id, Date ] , [ Hour ], Step ),
   ok.
 
 handle_info(_) -> {error, no_info }.
@@ -22,7 +21,9 @@ handle_report(_, _Report) -> { error, no_report }.
 
 
 handle_mysql_counter({ [ a, Advertiser, Affiliate, Offer_id, Offer_url_id, Date, Hour ] , Clicks_Total, Clicks_Unique }) ->
+  Id = hash:encode([Affiliate, Offer_url_id, Date, Hour]),
   mysql:counter_update(<<"clicks_hour">>, [
+    { <<"id">>, Id },
     {<<"affiliate_id">>, integer_to_binary(Affiliate)},
     {<<"advertiser_id">>, integer_to_binary(Advertiser)},
     {<<"offer_id">>, integer_to_binary(Offer_id)},
@@ -34,31 +35,5 @@ handle_mysql_counter({ [ a, Advertiser, Affiliate, Offer_id, Offer_url_id, Date,
     {<<"clicks_total">>, Clicks_Total},
     {<<"clicks_unique">>, Clicks_Unique}
   ]),
-  ok;
+  ok.
 
-handle_mysql_counter({[ a, Advertiser, Affiliate, Offer_id, Offer_url_id, Date ], Clicks_Total, Clicks_Unique }) ->
-  mysql:counter_update(<<"clicks_day">>, [
-    {<<"affiliate_id">>, integer_to_binary(Affiliate)},
-    {<<"advertiser_id">>, integer_to_binary(Advertiser)},
-    {<<"offer_id">>, integer_to_binary(Offer_id)},
-    {<<"offer_url_id">>, integer_to_binary(Offer_url_id)},
-    {<<"date">>, list_to_binary(date:to_string(Date))},
-    {<<"weekday">>, integer_to_binary(calendar:day_of_the_week(Date))}
-  ],[
-    {<<"clicks_total">>, Clicks_Total},
-    {<<"clicks_unique">>, Clicks_Unique}
-  ]),
-   ok;
-
- handle_mysql_counter({ [ b, Advertiser, Affiliate, Offer_id, Offer_url_id, { Year, Month } ] , Clicks_Total, Clicks_Unique }) ->
-   mysql:counter_update(<<"clicks_month">>, [
-     {<<"affiliate_id">>, integer_to_binary(Affiliate)},
-     {<<"advertiser_id">>, integer_to_binary(Advertiser)},
-     {<<"offer_id">>, integer_to_binary(Offer_id)},
-     {<<"offer_url_id">>, integer_to_binary(Offer_url_id)},
-     {<<"date">>, list_to_binary(date:to_string({Year, Month, 1}))}
-   ],[
-     {<<"clicks_total">>, Clicks_Total},
-     {<<"clicks_unique">>, Clicks_Unique}
-   ]),
-   ok.

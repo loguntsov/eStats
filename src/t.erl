@@ -56,7 +56,7 @@ random_click() ->
           { 4, random_prop({<<"1">>, <<"2">>, <<"3">>, <<"4">>, <<"5">>, <<"6">>, <<"7">>, <<"8">>}) },
           { 5, random:uniform(10000) }
         ]),  % Список subid
-        http_referer_hash = erlang:phash2(<< <<"http://referer.com/hello/world?hi=">>/binary, (erlang:integer_to_binary(random:uniform(100)))/binary>>),
+        http_referer = << <<"referer.com/hello/world?hi=">>/binary, (erlang:integer_to_binary(random:uniform(100)))/binary>>,
         domain = << <<"referer">>/binary, (erlang:integer_to_binary(random:uniform(10000)))/binary, <<".com">>/binary >>,
         user_agent = <<"Unknown">>,
         ip = <<"10.123.123.54">>,

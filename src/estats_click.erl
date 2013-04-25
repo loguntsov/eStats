@@ -17,9 +17,13 @@ from_json(Json) ->
 
     Date = {Year, Month, Day},
 
-    Subid = lists:map(fun(Number) ->
-      { Number, from_binary(proplists:get_value(<< <<"aff_subid">>/binary, (integer_to_binary(Number))/binary >>, Proplist, <<"">>)) }
-    end, lists:seq(1,5)),
+    Subid = lists:filter(fun
+      ({ _, undefined}) -> false;
+      ({ _, Binary }) when is_binary(Binary) -> true
+    end,
+    lists:map(fun(Number) ->
+      { Number, from_binary(proplists:get_value(<< <<"aff_subid">>/binary, (integer_to_binary(Number))/binary >>, Proplist, undefined)) }
+    end, lists:seq(1,5))),
     case date:is_valid(Date) of
       false -> throw({error, date_not_valid});
       true ->
@@ -38,7 +42,7 @@ from_json(Json) ->
             day_of_week = calendar:day_of_the_week(Date),
             is_unique = from_binary(proplists:get_value(<<"is_unique">>, Proplist, undefined)) > 0,
             ip = proplists:get_value(<<"ip">>, Proplist, undefined),
-            http_referer_hash = proplists:get_value(<<"referer_md5">>, Proplist, undefined),
+            http_referer = proplists:get_value(<<"referer">>, Proplist, undefined),
             domain = proplists:get_value(<<"referer_host">>, Proplist, undefined),
             user_agent = proplists:get_value(<<"useragent">>, Proplist, undefined),
             subid = dict:from_list([ { Index, Item } || { Index, Item} <- Subid, Item =/= ''])

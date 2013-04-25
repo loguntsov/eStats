@@ -9,7 +9,7 @@
   affiliate_id :: integer(), % ID аффила
   advertiser_id :: integer(), % ID рекламодателя
   subid :: dict(),  % Список subid
-  http_referer_hash :: binary(),
+  http_referer :: binary(),
   domain :: binary(),
   user_agent :: binary(),
   ip :: binary(),
