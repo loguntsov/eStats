@@ -4,7 +4,7 @@
 -include("include/logger.hrl").
 
 %% API
--export([start_link/1, counter_update/3]).
+-export([start_link/1, counter_update/3, select/1, select/2, q/2]).
 
 -behaviour(supervisor).
 -export([init/1]).
@@ -31,6 +31,25 @@ start_link(Db) ->
 
   supervisor:start_link({local, ?MODULE}, ?MODULE, {Count}).
 
+select(Query) ->
+  select(Query, []).
+
+select(Query, Args) when is_list(Query) ->
+  select(list_to_binary(Query),Args);
+
+select(Query, Args) when is_binary(Query) ->
+  Result = emysql:execute(mysql_pool, Query, Args),
+  result_packet = element(1, Result),
+  element(4, Result).
+
+q(Query, Args) when is_list(Query) ->
+  q(list_to_binary(Query), Args);
+
+q(Query, Args) when is_binary(Query) ->
+  Result = emysql:execute(mysql_pool, Query, Args),
+  ok_packet = element(1, Result),
+  ok.
+
 -spec counter_update(binary(), [ { binary(), binary() } ], [ { binary(), integer() } ] ) -> ok.
 counter_update(Table, Keys, Increment) ->
   CounterBinary = lists:map(fun({ Col, Value }) when is_binary(Col), is_integer(Value)->
@@ -39,19 +58,19 @@ counter_update(Table, Keys, Increment) ->
 
   KeyBinary = lists:foldl(fun
     ({ Col, Value }, <<>>) when is_binary(Col), is_binary(Value) ->
-      << Col/binary, <<"='">>/binary, Value/binary, <<"'">>/binary >>;
+      list_to_binary([ Col, <<"='">>, Value, <<"'">>]);
     ({ Col, Value }, Binary) when is_binary(Col), is_binary(Value) ->
-      << Binary/binary, <<",">>/binary, Col/binary, <<"='">>/binary, Value/binary, <<"'">>/binary >>
-  end, <<>>, Keys ++ CounterBinary),
+      list_to_binary([ Binary, <<",">>, Col, <<"='">>, Value, <<"'">> ])
+  end, <<>>, CounterBinary ++ Keys),
 
-  IncrementBinary = lists:foldl(fun
-    ({ Col, Value }, <<>>) ->
-      << <<"`">>/binary, Col/binary, <<"`=`">>/binary, Col/binary, <<"`+">>/binary, Value/binary >>;
+  IncrementBinary = list_to_binary(lists:foldl(fun
+    ({ Col, Value }, []) ->
+      [<<"`">>, Col, <<"`=`">>, Col, <<"`+">>, Value];
     ({ Col, Value }, Binary) ->
-      << Binary/binary, <<",`">>/binary, Col/binary, <<"`=`">>/binary, Col/binary, <<"`+">>/binary, Value/binary >>
-  end, <<>>, CounterBinary),
+      [ <<"`">>, Col, <<"`=`">>, Col, <<"`+">>, Value, <<",">> | Binary ]
+  end, [], CounterBinary)),
 
-  Query = << <<"INSERT INTO `">>/binary, Table/binary, <<"` SET ">>/binary, KeyBinary/binary, <<" ON DUPLICATE KEY UPDATE ">>/binary, IncrementBinary/binary >>,
+  Query = list_to_binary([ <<"INSERT INTO `">>, Table, <<"` SET ">>, KeyBinary, <<" ON DUPLICATE KEY UPDATE ">>, IncrementBinary ]),
 
   %?INFO_(Query),
 
@@ -71,7 +90,13 @@ worker(TotalCount, Query) ->
       Pid = spawn_link(fun() ->
         receive
           { query , Q } ->
-            emysql:execute(mysql_pool, Q)
+            Result = emysql:execute(mysql_pool, Q),
+            try
+              ok_packet = element(1, Result)
+            catch
+              error:{badmatch, _} ->
+                erlang:error({badarg,binary_to_list(Q),element(5,Result)})
+            end
         end
       end),
       Pid ! { query, Query },

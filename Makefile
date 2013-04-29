@@ -1,4 +1,4 @@
-ERL_RUN_ARGS:=-pa src -pa ebin -pa deps/*/ebin
+ERL_RUN_ARGS:=-pa src -pa ebin -pa deps/*/ebin -pa src/* -pa include/
 
 compile: 
 	@./rebar compile
