@@ -3,7 +3,9 @@
 -export([encode/1]).
 
 encode(List) when is_list(List) ->
-  base64:encode(list_to_binary(lists:sublist(binary_to_list(crypto:md5(list_to_string(List))),15))).
+  Key = base64:encode(list_to_binary(lists:sublist(binary_to_list(crypto:md5(list_to_string(List))),15))),
+  Key0 = binary:replace(Key, <<"+">>,<<"-">>, [global]),
+  binary:replace(Key, <<"/">>,<<"_">>, [global]).
 
 list_to_string([]) -> [];
 list_to_string([Item]) -> lists:flatten([to_binary(Item)]);

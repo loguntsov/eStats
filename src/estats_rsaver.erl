@@ -36,15 +36,15 @@ init(_Options) ->
 
 handle_cast({ sync, Module, { counter, Ets, Dets } }, State) ->
   ok = ets:foldl(fun(Term, _) ->
-    Key = element(1,Term),
-    case estats_table:lookup(dets, Dets, Key) of
-      [ ] ->
-        dets:insert(Dets, Term);
-      [ Tuple ] when is_tuple(Tuple) ->
-        dets:insert(Dets, list_to_tuple(
-          [ Key | estats_counter:step_sum(estats_counter:tuple_to_value_list(Tuple), estats_counter:tuple_to_value_list(Term) )]
-        ))
-    end,
+%%    Key = element(1,Term),
+%%     case estats_table:lookup(dets, Dets, Key) of
+%%       [ ] ->
+%%         dets:insert(Dets, Term);
+%%       [ Tuple ] when is_tuple(Tuple) ->
+%%         dets:insert(Dets, list_to_tuple(
+%%           [ Key | estats_counter:step_sum(estats_counter:tuple_to_value_list(Tuple), estats_counter:tuple_to_value_list(Term) )]
+%%         ))
+%%     end,
     run_from_report(Module, handle_mysql_counter, Term),
     ok
   end, ok, Ets),
@@ -53,17 +53,17 @@ handle_cast({ sync, Module, { counter, Ets, Dets } }, State) ->
   { stop, normal, State };
 
 handle_cast({sync, _Module, { index, Ets, Dets }}, State) ->
-  ok = ets:foldl(fun({Key, Value}, _) ->
-    dets:insert(Dets, { Key, Value })
-  end, ok, Ets),
+%%   ok = ets:foldl(fun({Key, Value}, _) ->
+%%     dets:insert(Dets, { Key, Value })
+%%   end, ok, Ets),
   ets:delete(Ets),
   dets:sync(Dets),
   { stop, normal, State };
 
 handle_cast({sync, _Module, { map, Ets, Dets }}, State) ->
-  ok = ets:foldl(fun({Key, Value}, _) ->
-    dets:insert(Dets, { Key, Value })
-  end, ok, Ets),
+%%   ok = ets:foldl(fun({Key, Value}, _) ->
+%%     dets:insert(Dets, { Key, Value })
+%%   end, ok, Ets),
   ets:delete(Ets),
   dets:sync(Dets),
   { stop, normal, State };

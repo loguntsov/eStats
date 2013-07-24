@@ -12,6 +12,7 @@
 -export([worker/2]).
 
 -define(CONNECTIONS, 10).
+-define(TIMEOUT, 10 * 60 * 1000).
 
 start_link(Db) ->
 
@@ -38,7 +39,7 @@ select(Query, Args) when is_list(Query) ->
   select(list_to_binary(Query),Args);
 
 select(Query, Args) when is_binary(Query) ->
-  Result = emysql:execute(mysql_pool, Query, Args),
+  Result = emysql:execute(mysql_pool, Query, Args, ?TIMEOUT),
   result_packet = element(1, Result),
   element(4, Result).
 
@@ -46,7 +47,7 @@ q(Query, Args) when is_list(Query) ->
   q(list_to_binary(Query), Args);
 
 q(Query, Args) when is_binary(Query) ->
-  Result = emysql:execute(mysql_pool, Query, Args),
+  Result = emysql:execute(mysql_pool, Query, Args, ?TIMEOUT ),
   ok_packet = element(1, Result),
   ok.
 
@@ -90,7 +91,7 @@ worker(TotalCount, Query) ->
       Pid = spawn_link(fun() ->
         receive
           { query , Q } ->
-            Result = emysql:execute(mysql_pool, Q),
+            Result = emysql:execute(mysql_pool, Q, ?TIMEOUT),
             try
               ok_packet = element(1, Result)
             catch

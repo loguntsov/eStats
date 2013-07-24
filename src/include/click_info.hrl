@@ -20,6 +20,7 @@
   month :: integer(),
   day :: integer(),
   hour :: integer(),
-  is_unique :: boolean()
+  is_unique :: boolean(),
+  country :: binary()
 }).
 

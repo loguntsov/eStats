@@ -17,13 +17,10 @@ from_json(Json) ->
 
     Date = {Year, Month, Day},
 
-    Subid = lists:filter(fun
-      ({ _, undefined}) -> false;
-      ({ _, Binary }) when is_binary(Binary) -> true
-    end,
-    lists:map(fun(Number) ->
+    Subid = lists:map(fun(Number) ->
       { Number, from_binary(proplists:get_value(<< <<"aff_subid">>/binary, (integer_to_binary(Number))/binary >>, Proplist, undefined)) }
-    end, lists:seq(1,5))),
+    end, lists:seq(1,5)),
+
     case date:is_valid(Date) of
       false -> throw({error, date_not_valid});
       true ->
@@ -45,7 +42,8 @@ from_json(Json) ->
             http_referer = proplists:get_value(<<"referer">>, Proplist, undefined),
             domain = proplists:get_value(<<"referer_host">>, Proplist, undefined),
             user_agent = proplists:get_value(<<"useragent">>, Proplist, undefined),
-            subid = dict:from_list([ { Index, Item } || { Index, Item} <- Subid, Item =/= ''])
+            subid = dict:from_list([ { Index, Item } || { Index, Item} <- Subid, Item =/= <<"">>, Item =/= undefined]),
+            country = proplists:get_value(<<"country_code">>, Proplist, undefined)
         },
         { ok, Click }
     end
@@ -58,7 +56,7 @@ from_json(Json) ->
 from_binary(Term) when not(is_binary(Term)) -> Term;
 from_binary(Term) ->
   try
-    erlang:binary_to_integer(Term, utf8)
+    erlang:binary_to_integer(Term)
   catch
     error:badarg ->
       try

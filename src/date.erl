@@ -5,10 +5,10 @@
 -include("include/types.hrl").
 
 %% API
--export([year/1, month/1, day/1, is_valid/1, gregorian_days/1, period_to_list/1, next_days/2, between/2, to_string/1, to_string/2,
+-export([year/1, month/1, day/1, is_valid/1, is_less/2, gregorian_days/1, period_to_list/1, next_days/2, between/2, to_string/1, to_string/2,
   to_proplists/1, from_proplists/1, proplists_is_date/1, to_binary/1, to_binary/2,from_sql_binary/1, to_sql_binary/1,
   to_week_number/1, from_week_number/1, start_week/1,
-  start_month/1
+  start_month/1, now/0, max/2
 ]).
 
 -spec year(Date :: date()) -> integer().
@@ -27,10 +27,6 @@ is_valid(Date) ->
 -spec gregorian_days(Dates :: [ date() ]) -> [ integer() ].
 gregorian_days(Dates) ->
   [ calendar: date_to_gregorian_days(Date) || Date <- Dates ].
-
--spec is_less(Date1 :: date(), Date2 :: date()) -> boolean().
-is_less(Date1, Date2) ->
-  (calendar:date_to_gregorian_days(Date1) - calendar:date_to_gregorian_days(Date2)) < 0.
 
 -spec next_days(Date :: date(), Days :: integer() ) -> date().
 next_days(Date, 0) -> Date;
@@ -136,4 +132,26 @@ start_week(Date) ->
 
 start_month({Year, Month, _ }) ->
   {Year, Month, 1}.
+
+-spec is_less(date()|undefined, date()|undefined) -> boolean().
+is_less(undefined, _) -> false;
+is_less(_, undefined) -> false;
+is_less({Y0, _, _}, { Y1,_,_}) when Y0 < Y1 -> true;
+is_less({Y0, M0, _}, { Y1,M1,_}) when Y0==Y1, M0 < M1 -> true;
+is_less({Y0, M0, D0}, { Y1,M1,D1}) when Y0==Y1, M0==M1, D0 < D1 -> true;
+is_less(_, _) -> false.
+
+
+-spec now() ->
+  { date(), { Hour :: integer(), Minute :: integer(), Second :: integer() } }.
+
+now() ->
+  TS = os:timestamp(),
+  calendar:now_to_universal_time(TS).
+
+max(Date1, Date2) ->
+  case is_less(Date1, Date2) of
+    true -> Date2;
+    false -> Date1
+  end.
 

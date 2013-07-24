@@ -15,7 +15,8 @@
   code_change/3]).
 
 -define(USE_TIMEOUT, 5). %% Время бездействия, до выключения данного субсервера, в минутах
--define(SAVE_TIMEOUT, 6000). %% Время между двумя попытками записать данные на диск, мс.
+-define(SAVE_TIMEOUT, 6000). %% Стандартное время между двумя попытками записать данные на диск, мс. Применяется для данных текущих суток
+-define(MAX_SAVE_TIMEOUT, 120000). %% Максимальное время между двумя попытками записать данные на диск, мс. Применяется для данных прошлых суток
 
 %% API
 start_link(Type, Path, Mode) ->
@@ -29,6 +30,7 @@ start_link(Type, Path, Mode) ->
   is_changed :: boolean(),
   rsaver_sup :: pid(),
   last_use :: timestamp(),
+  click_max_date :: date(),
   mode :: readonly | readwrite
 }).
 
@@ -102,7 +104,7 @@ handle_cast({click, Click }, #state { report = Report } = State) when State#stat
   end,
   estats_report:index_add(NewState#state.report, dates_info, Click#click_info.date ),
   (NewState#state.report#report_info.module):handle_click(Click, NewState#state.report),
-  {noreply, now_use(now_chanded(NewState))};
+  {noreply, now_use(now_chanded(NewState#state{ click_max_date = max(NewState#state.click_max_date, Click#click_info.date) }))};
 
 handle_cast(_Request, State) ->
   {noreply, State}.
@@ -113,7 +115,7 @@ handle_info(tick, State) when not(State#state.is_changed) ->
     Time > ?USE_TIMEOUT * 60000000 ->
       { stop, normal, State };
     true ->
-      tick(),
+      tick(State),
       { noreply, State }
   end;
 
@@ -121,13 +123,13 @@ handle_info(tick, State) ->
   case estats_rsaver_sup:is_tasks_done(State#state.rsaver_sup) of
     true ->
       {ok, Report } = estats_rsaver:flush(State#state.rsaver_sup,State#state.report),
-      tick(),
+      tick(State),
       {noreply, State#state{
         report = estats_report:create_ets(Report),
         is_changed = false
       }};
     false ->
-      tick(),
+      tick(State),
       { noreply, State }
   end;
 
@@ -147,7 +149,7 @@ terminate(_Reason, State) ->
 ensure_task_done(RsaverSupPid) ->
   case estats_rsaver_sup:is_tasks_done(RsaverSupPid) of
     true -> ok;
-    _ ->
+    false ->
       timer:sleep(1),
       ensure_task_done(RsaverSupPid)
   end.
@@ -156,13 +158,26 @@ code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
 -spec tick() -> ok.
+tick(Timeout) when is_integer(Timeout) ->
+  timer:send_after(Timeout, tick ),
+  ok;
+
+tick(State) when is_record(State, state) ->
+  { NowDate, _ } = date:now(),
+  case date:is_less(State#state.click_max_date, date:next_days(NowDate, -1)) of
+    false -> tick(?SAVE_TIMEOUT);
+    true -> tick(?MAX_SAVE_TIMEOUT)
+  end.
+
 tick() ->
-  timer:send_after(?SAVE_TIMEOUT, tick ),
-  ok.
+  tick(?SAVE_TIMEOUT).
+
 
 now_use(State) ->
   State#state { last_use = os:timestamp() }.
 
 now_chanded(State) ->
   State#state { is_changed = true }.
+
+
 

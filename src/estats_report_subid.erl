@@ -29,7 +29,8 @@ handle_report(_, _Report) -> { error, no_report }.
 
 handle_mysql_counter({ [ a,  Date, Index, Subid, Advertiser, Offer, Affiliate, Offer_url_id ] , Clicks_Total, Clicks_Unique }) ->
   Id = hash:encode([Subid, Affiliate, Offer_url_id, Date]),
-  mysql:counter_update(<< <<"hashes_">>/binary, (integer_to_binary(Index-1))/binary, <<"_day">>/binary >>, [
+  true = ((Index > 0) and (Index < 6)),
+  mysql:counter_update(list_to_binary([ <<"hashes_">>, integer_to_binary(Index+1), <<"_day">> ]), [
     { <<"id">>, Id },
     { <<"hash">>, Subid },
     {<<"affiliate_id">>, integer_to_binary(Affiliate)},

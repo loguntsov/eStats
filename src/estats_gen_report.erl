@@ -20,7 +20,7 @@
 }).
 
 -define(REPORT_MAX_SIZE, 536870912). % Максимальный размер файлов отчета за период (512 мб)
--define(REPORT_MAX_DATE_LENGHT, 30). % Максимальное кол-во дней в одном файле отчете (в периоде)
+-define(REPORT_MAX_DATE_LENGHT, 2). % Максимальное кол-во дней в одном файле отчете (в периоде)
 
 -callback handle_click(Click :: click_info, Report :: report_info) ->
   ok.

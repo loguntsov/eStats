@@ -37,7 +37,7 @@ get(Key) ->
 
 -spec call(Msg :: term()) -> term().
 call(Msg) ->
-  gen_server:call(pid(), Msg).
+  gen_server:call(pid(), Msg, infinity).
 
 -spec pid() -> pid().
 pid() ->

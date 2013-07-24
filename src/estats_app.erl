@@ -17,11 +17,13 @@ start() ->
   ok = application:start(ranch),
 	ok = application:start(cowboy),
   ok = application:start(emysql),
+  ok = application:start(inets),
 	ok = application:start(estats),
 	ok.
 
 stop() ->
   application:stop(estats),
+  application:stop(inets),
   application:stop(emysql),
   application:stop(cowboy),
   application:stop(ranch),

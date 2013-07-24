@@ -18,7 +18,10 @@ sync_task(PidSup, Msg) ->
   {ok, ChildPid }.
 
 is_tasks_done(PidSup) ->
-  length(supervisor:which_children(PidSup)) == 0.
+  case supervisor:which_children(PidSup) of
+    [] -> true;
+    _ -> false
+  end.
 
 %% supervisor callbacks
 init([]) ->
